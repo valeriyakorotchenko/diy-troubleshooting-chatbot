@@ -35,8 +35,6 @@ uvicorn diy_troubleshooting.api.main:app --reload
 
 You can test the API using `curl` commands in your terminal or by using the built-in Swagger UI.
 
-#### **Option A: Using Swagger UI (Recommended)**
-
 FastAPI provides an interactive UI to test endpoints easily.
 
 1.  Open your browser and navigate to: `http://127.0.0.1:8000/docs`
@@ -51,31 +49,3 @@ FastAPI provides an interactive UI to test endpoints easily.
       * In the Request Body, enter: `{"text": "My shower water is lukewarm"}`.
       * Click **Execute**.
       * You should receive a JSON response with the agent's reply.
-
-#### **Option B: Using CURL (Terminal)**
-
-**Step 1: Create a Session**
-
-```bash
-curl -X POST "http://127.0.0.1:8000/sessions"
-```
-
-  * *Copy the ID returned in the JSON response.*
-
-**Step 2: Start the Workflow**
-Replace `{SESSION_ID}` with the ID you copied.
-
-```bash
-curl -X POST "http://127.0.0.1:8000/sessions/{SESSION_ID}/messages" \
-     -H "Content-Type: application/json" \
-     -d '{"text": "My shower water is lukewarm"}'
-```
-
-**Step 3: Continue the Conversation**
-Use the same command with your next reply:
-
-```bash
-curl -X POST "http://127.0.0.1:8000/sessions/{SESSION_ID}/messages" \
-     -H "Content-Type: application/json" \
-     -d '{"text": "I checked it, it is set to 120."}'
-```
