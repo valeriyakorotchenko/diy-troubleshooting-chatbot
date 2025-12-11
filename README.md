@@ -1,8 +1,6 @@
 # diy-troubleshooting-chatbot
 
-Here are the step-by-step instructions for running the server and testing the endpoints. You can include this in your `README.md` or just follow along to verify the system works.
-
-### **1. Environment Setup**
+### **Environment Setup**
 
 First, ensure your environment is configured correctly.
 
@@ -19,7 +17,7 @@ First, ensure your environment is configured correctly.
     pip install fastapi uvicorn openai pydantic pydantic-settings
     ```
 
-### **2. Running the Server**
+### **Running the Server**
 
 Start the FastAPI server from the project root directory.
 
@@ -31,7 +29,7 @@ uvicorn diy_troubleshooting.api.main:app --reload
   * `--reload`: Enabling this flag ensures the server automatically restarts whenever you make code changes.
   * You should see output indicating the server is running at `http://127.0.0.1:8000`.
 
-### **3. Testing the Endpoints**
+### **Testing the Endpoints**
 
 You can test the API using `curl` commands in your terminal or by using the built-in Swagger UI.
 
