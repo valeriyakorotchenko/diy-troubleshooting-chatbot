@@ -16,13 +16,13 @@ step_01 = Step(
     warning="Do not set the temperature above 120°F (scalding risk).",
     options=[
         Option(
-            id="was_low", 
-            label="Yes, it was low. I adjusted it.", 
+            id="was_low",
+            label="The thermostat was set too low. User adjusted it and the issue is now resolved.",
             next_step_id="end_success_thermostat"
         ),
         Option(
-            id="was_correct", 
-            label="No, it was already correct (or adjusting didn't help).", 
+            id="was_correct",
+            label="The thermostat was already set correctly, or adjusting it did not resolve the issue.",
             next_step_id="step_02_breaker"
         ),
     ]
@@ -39,13 +39,13 @@ step_02 = Step(
     ),
     options=[
         Option(
-            id="tripped", 
-            label="Yes, it was tripped.", 
+            id="tripped",
+            label="The circuit breaker was found in a tripped state.",
             next_step_id="step_02a_reset_breaker"
         ),
         Option(
-            id="not_tripped", 
-            label="No, the breaker is ON.", 
+            id="not_tripped",
+            label="The circuit breaker is in the ON position and functioning normally.",
             next_step_id="step_03_demand"
         ),
     ]
@@ -71,13 +71,13 @@ step_03 = Step(
     ),
     options=[
         Option(
-            id="heavy_use", 
-            label="Yes, we used a lot of water recently.", 
+            id="heavy_use",
+            label="The household experienced high hot water demand recently (multiple appliances or showers running).",
             next_step_id="end_wait_recovery"
         ),
         Option(
-            id="normal_use", 
-            label="No, usage has been normal.", 
+            id="normal_use",
+            label="Hot water usage has been within normal patterns with no unusual demand.",
             next_step_id="step_04_leak"
         ),
     ]
@@ -92,13 +92,13 @@ step_04 = Step(
     warning="If you see a leak, turn off the water supply immediately to prevent damage.",
     options=[
         Option(
-            id="leaking", 
-            label="Yes, there is water leaking.", 
+            id="leaking",
+            label="Visible water leak detected around the hot water tank.",
             next_step_id="end_call_pro_leak"
         ),
         Option(
-            id="dry", 
-            label="No, it's dry.", 
+            id="dry",
+            label="No visible leaks; the area around the tank is dry.",
             next_step_id="step_05_gas_smell"
         ),
     ]
@@ -113,13 +113,13 @@ step_05 = Step(
     warning="If you smell gas, leave the home and call 911/Gas Company.",
     options=[
         Option(
-            id="gas_leak", 
-            label="Yes, I smell gas.", 
+            id="gas_leak",
+            label="Gas odor (rotten egg smell) detected near the water heater.",
             next_step_id="end_emergency_gas"
         ),
         Option(
-            id="no_gas_issues", 
-            label="No smell / Electric heater.", 
+            id="no_gas_issues",
+            label="No gas smell present, or the unit is an electric water heater.",
             next_step_id="end_consult_pro_complex"
         ),
     ]
