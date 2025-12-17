@@ -11,12 +11,17 @@ from pydantic import BaseModel, Field
 
 class StepStatus(str, Enum):
     """
-    The distinct states a Step can result in after a turn.
+    Represents the LLM's assessment of goal completion for the current step.
+    It answers a single question: "Based on the user's latest input, has the specific goal defined in this step been satisfied?"
+
+    IN_PROGRESS: The goal is not yet met; more interaction is needed.
+    COMPLETE: The goal is fully satisfied.
+    GIVE_UP: The goal cannot be met due to a blocker or safety issue.
     """
-    IN_PROGRESS = "IN_PROGRESS"       # Goal not met, keep chatting
-    COMPLETE = "COMPLETE"             # Goal met, move to next step
-    CALL_WORKFLOW = "CALL_WORKFLOW"   # User agreed to branch to child workflow
-    GIVE_UP = "GIVE_UP"               # Escalate to human
+    IN_PROGRESS = "IN_PROGRESS"       
+    COMPLETE = "COMPLETE"             
+    CALL_WORKFLOW = "CALL_WORKFLOW"  
+    GIVE_UP = "GIVE_UP"          
 
 class StepDecision(BaseModel):
     """
