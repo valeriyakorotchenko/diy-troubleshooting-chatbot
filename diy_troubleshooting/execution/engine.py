@@ -7,10 +7,10 @@ execution to the StepExecutor.
 """
 
 import logging
-from typing import Optional
+from typing import Tuple
 
-from ..state.models import SessionState, Frame, Message, WorkflowResult
-from ..domain.models import Workflow
+from ..state.models import SessionState, Frame, Message
+from ..domain.models import Workflow, Step
 from ..schemas.decisions import StepStatus, StepDecision
 from ..repositories.workflow import WorkflowRepository
 from ..llm.interface import LLMProvider
@@ -19,47 +19,68 @@ from .executor import StepExecutor
 logger = logging.getLogger(__name__)
 
 class WorkflowEngine:
-    # Depends on the LLMProvider and WorkflowRepository
     def __init__(self, repository: WorkflowRepository, llm_provider: LLMProvider):
         self.repository = repository
         self.llm_provider = llm_provider
 
     async def handle_message(self, session: SessionState, user_input: str) -> StepDecision:
         """
-        The main entry point. Receives user input, runs the current step,
-        updates state, and returns the response.
+        The Orchestrator.
+        Currently runs a single 'Ping-Pong' turn (User -> Agent -> State Update).
+        (no proactive turns from the agent)
         """
-
-        # 1. Identify where we are
-        active_frame = session.active_frame
-        if not active_frame:
-            raise ValueError("Session stack is empty.")
-
-        # 2. Get Workflow and Step Definitions from Repository
-        workflow_def = self.repository.get_workflow(active_frame.workflow_name)
-        step_def = workflow_def.steps[active_frame.current_step_id]
-
-        # 3. Execute the Turn (The 'Logic' part)
-        # Note: We instantiate Executor per-request, but inject the heavy Provider
-        executor = StepExecutor(self.llm_provider)
         
-        decision = await executor.run_turn(
-            step=step_def,
-            frame=active_frame,
+        # 1. Load Context (Frame & Definitions)
+        active_frame, workflow_def, step_def = self._get_execution_context(session)
+
+        # 2. Execute Step (The Worker)
+        decision = await self._execute_step(
+            active_frame=active_frame,
+            step_def=step_def,
             user_input=user_input,
             history=session.history
         )
 
-        # 4. State Transition Logic (The 'State Machine' part)
+        # 3. Apply Decision (The State Machine)
         await self._apply_decision(session, active_frame, workflow_def, decision)
 
-        # 5. Append interaction to History
-        # (the original input and the final reply)
-        if user_input:
-            session.history.append(Message(role="user", content=user_input))
-        session.history.append(Message(role="assistant", content=decision.reply_to_user))
+        # 4. Update History (The Logger)
+        self._update_history(session, user_input, decision)
 
         return decision
+
+    # --- Helper Methods ---
+
+    def _get_execution_context(self, session: SessionState) -> Tuple[Frame, Workflow, Step]:
+        """
+        Retrieves the necessary data to run the current turn.
+        """
+        active_frame = session.active_frame
+        if not active_frame:
+            raise ValueError("Session stack is empty. Workflow has ended or not started.")
+        
+        workflow_def = self.repository.get_workflow(active_frame.workflow_name)
+        step_def = workflow_def.steps[active_frame.current_step_id]
+        
+        return active_frame, workflow_def, step_def
+
+    async def _execute_step(
+        self, 
+        active_frame: Frame, 
+        step_def: Step, 
+        user_input: str, 
+        history: list[Message]
+    ) -> StepDecision:
+        """
+        Instantiates a fresh Executor and gets the LLM's decision.
+        """
+        executor = StepExecutor(self.llm_provider)
+        return await executor.run_turn(
+            step=step_def,
+            frame=active_frame,
+            user_input=user_input,
+            history=history
+        )
 
     async def _apply_decision(
         self, 
@@ -70,45 +91,58 @@ class WorkflowEngine:
     ):
         """
         Updates the SessionState based on the LLM's decision.
+        Handles transitions, option selection, and stack management.
         """
-
         if decision.status == StepStatus.IN_PROGRESS:
-            # Stay on current step. Do nothing to the stack.
-            pass
+            return  # No state change needed
 
-        elif decision.status == StepStatus.COMPLETE:
-            # Clear any pending child results (we consumed them)
-            frame.pending_child_result = None
+        if decision.status == StepStatus.COMPLETE:
+            self._handle_complete_status(session, frame, workflow, decision)
             
-            # Logic: Determine Next Step
-            current_step = workflow.steps[frame.current_step_id]
-            next_step_id = None
-            
-            # Case A: Choice-based branching
-            if current_step.type == "ask_choice" and current_step.options:
-                # Find the option that matches the result_value
-                selected_option = next((opt for opt in current_step.options if opt.id == decision.result_value), None)
-                next_step_id = selected_option.next_step_id if selected_option else current_step.next_step
-            
-            # Case B: Linear flow - for all other step types, use default next_step
-            else:
-                next_step_id = current_step.next_step
+        elif decision.status == StepStatus.GIVE_UP:
+            pass # In future, this might trigger an escalation flag
 
-            # WORKFLOW TERMINATION CHECK
-            # If next_step is None or type is 'end', we pop the stack (Workflow Complete)
-            # For this MVP, let's assume if the step ID starts with "end_", it's over.
-            if not next_step_id:
-                # End of workflow
+    def _handle_complete_status(
+        self, 
+        session: SessionState, 
+        frame: Frame, 
+        workflow: Workflow, 
+        decision: StepDecision
+    ):
+        """Logic for advancing the workflow pointer when a step is done."""
+        # 1. Clear mailbox
+        frame.pending_child_result = None
+        
+        # 2. Determine Next Step ID
+        current_step = workflow.steps[frame.current_step_id]
+        next_step_id = None
+        
+        # Branching vs Linear Logic
+        if current_step.type == "ask_choice" and current_step.options:
+            selected_option = next(
+                (opt for opt in current_step.options if opt.id == decision.result_value), 
+                None
+            )
+            next_step_id = selected_option.next_step_id if selected_option else current_step.next_step
+        else:
+            next_step_id = current_step.next_step
+
+        # 3. Update Pointers
+        if not next_step_id:
+            session.stack.pop() # End of Workflow
+        else:
+            # Check if next step is an explicit 'end' node
+            next_step_def = workflow.steps.get(next_step_id)
+            if next_step_def and next_step_def.type == "end":
                 session.stack.pop()
             else:
-                # Check if the *next* step is an end node
-                next_step_def = workflow.steps.get(next_step_id)
-                if next_step_def and next_step_def.type == "end":
-                    # We are done. Pop the stack.
-                    session.stack.pop()
-                else:
-                    # Advance the pointer
-                    frame.current_step_id = next_step_id
+                frame.current_step_id = next_step_id
 
-        elif decision.status == StepStatus.GIVE_UP:
-            pass
+    def _update_history(self, session: SessionState, user_input: str, decision: StepDecision):
+        """
+        Appends the interaction to the session history.
+        """
+        if user_input:
+            session.history.append(Message(role="user", content=user_input))
+        
+        session.history.append(Message(role="assistant", content=decision.reply_to_user))
