@@ -20,6 +20,11 @@ class SessionRepository(ABC):
         """Persists the session state."""
         pass
 
+    @abstractmethod
+    def delete(self, session_id: str) -> bool:
+        """Deletes a session. Returns True if found and deleted."""
+        pass
+
 class InMemorySessionRepository(SessionRepository):
     """
     For now, we'll use an in-memory dictionary, 
@@ -41,3 +46,9 @@ class InMemorySessionRepository(SessionRepository):
 
     def save(self, session: SessionState):
         self._store[session.session_id] = session
+
+    def delete(self, session_id: str) -> bool:
+        if session_id in self._store:
+            del self._store[session_id]
+            return True
+        return False
