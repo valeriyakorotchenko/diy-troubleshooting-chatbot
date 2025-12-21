@@ -21,7 +21,7 @@ class WorkflowRouter(ABC):
         pass
 
 
-class HardcodedWorkflowRouter(WorkflowRouter):
+class MockWorkflowRouter(WorkflowRouter):
     """
     Temporary Stub: Always returns the 'Lukewarm Water' workflow
     regardless of what the user types.
