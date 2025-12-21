@@ -82,13 +82,9 @@ class ChatService:
         # 4. Save Session
         self.session_repo.save(session)
 
-        # 5. Construct Metadata (Title, Progress)
-        active_workflow_meta = self._get_active_workflow_metadata(session)
-
         return {
             "reply": decision.reply_to_user,
             "status": decision.status,
-            "active_workflow": active_workflow_meta,
             "debug_info": None # todo: populate this field
         }
 
@@ -117,29 +113,3 @@ class ChatService:
             session.stack.append(initial_frame)
         else:
             logger.warning("Router found no matching workflow.")
-
-    def _get_active_workflow_metadata(self, session: SessionState) -> Optional[dict]:
-        """
-        Helper to extract metadata about the current workflow.
-        """
-        frame = session.active_frame
-        if not frame:
-            return None
-            
-        try:
-            wf = self.workflow_repo.get_workflow(frame.workflow_name)
-            
-            # Calculate simple progress (optional improvement: pre-calculate total steps)
-            step_count = len(wf.steps)
-            
-            return {
-                "id": wf.name,
-                # In the future, 'Workflow' model needs a 'title' field. 
-                # For now, we use the name or ID.
-                "title": wf.name.replace("_", " ").title(),
-                "step_id": frame.current_step_id,
-                "total_steps": step_count
-            }
-        except Exception:
-            # Fallback if workflow definition is missing or corrupt
-            return None
