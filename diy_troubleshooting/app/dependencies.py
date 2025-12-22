@@ -23,8 +23,10 @@ from ..llm.adapters.openai_adapter import OpenAIAdapter
 from ..repositories.workflow import WorkflowRepository, StaticWorkflowRepository
 from ..repositories.session import SessionRepository, InMemorySessionRepository
 from ..execution.engine import WorkflowEngine
+from ..services.workflow_router import WorkflowRouter, MockWorkflowRouter
+from ..services.chat import ChatService
 
-# 1. LLM Provider (Singleton)
+# LLM Provider (Singleton)
 @lru_cache()
 def get_llm_provider() -> LLMProvider:
     return OpenAIAdapter(
@@ -32,21 +34,44 @@ def get_llm_provider() -> LLMProvider:
         model_name=settings.OPENAI_MODEL
     )
 
-# 2. Workflow Repository (Singleton)
+# The Router (Singleton)
+@lru_cache()
+def get_workflow_router() -> WorkflowRouter:
+    return MockWorkflowRouter()
+
+# Workflow Repository (Singleton)
 @lru_cache()
 def get_workflow_repository() -> WorkflowRepository:
     return StaticWorkflowRepository()
 
-# 3. Session Repository (Singleton)
+# Session Repository (Singleton)
 # Note: In-memory storage must be a singleton so data persists across requests!
 @lru_cache()
 def get_session_repository() -> SessionRepository:
     return InMemorySessionRepository()
 
-# 4. The Engine (Singleton Service)
+# The Engine (Singleton Service)
 @lru_cache()
 def get_workflow_engine(
     llm: LLMProvider = Depends(get_llm_provider),
     repo: WorkflowRepository = Depends(get_workflow_repository)
 ) -> WorkflowEngine:
     return WorkflowEngine(repository=repo, llm_provider=llm)
+ 
+# The Chat Service (Singleton Service)
+@lru_cache()
+def get_chat_service(
+    session_repo: SessionRepository = Depends(get_session_repository),
+    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
+    engine: WorkflowEngine = Depends(get_workflow_engine),
+    router: WorkflowRouter = Depends(get_workflow_router)
+) -> ChatService:
+    """
+    Injects all necessary components into the ChatService.
+    """
+    return ChatService(
+        session_repository=session_repo,
+        workflow_repository=workflow_repo,
+        engine=engine,
+        router=router
+    )
