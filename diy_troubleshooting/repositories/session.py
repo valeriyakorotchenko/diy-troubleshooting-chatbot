@@ -1,8 +1,15 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Optional
 import uuid
+from abc import ABC, abstractmethod
+from typing import Optional, Dict
+from datetime import datetime
 
+from sqlmodel import Session, select
+
+# Domain & Infra Imports
 from ..state.models import SessionState
+from ..infrastructure.database.tables import SessionDBModel
+from ..infrastructure.database.connection import engine
+
 
 class SessionRepository(ABC):
     @abstractmethod
@@ -25,11 +32,10 @@ class SessionRepository(ABC):
         """Deletes a session. Returns True if found and deleted."""
         pass
 
+
 class InMemorySessionRepository(SessionRepository):
     """
-    For now, we'll use an in-memory dictionary, 
-    but this design ensures we can swap it for Redis/Postgres later 
-    without changing the API code.
+    Uses in-memory dictionary for session storage for testing/dev purposes.
     """
 
     def __init__(self):
@@ -52,3 +58,68 @@ class InMemorySessionRepository(SessionRepository):
             del self._store[session_id]
             return True
         return False
+
+
+class PostgresSessionRepository(SessionRepository):
+    """
+    PostgreSQL + JSONB storage for session state.
+    """
+
+    def create(self) -> SessionState:
+        # Create the (Domain) Python object
+        new_id = str(uuid.uuid4())
+        domain_session = SessionState(session_id=new_id)
+
+        # Save to DB
+        db_model = SessionDBModel(
+            session_id=new_id, state=domain_session.model_dump(mode="json")
+        )
+
+        with Session(engine) as db:
+            db.add(db_model)
+            db.commit()
+
+        return domain_session
+
+    def get(self, session_id: str) -> Optional[SessionState]:
+        with Session(engine) as db:
+            statement = select(SessionDBModel).where(
+                SessionDBModel.session_id == session_id
+            )
+            result = db.exec(statement).first()
+
+            if not result:
+                return None
+
+            # Deserialize JSONB back into Pydantic Domain Model
+            return SessionState(**result.state)
+
+    def save(self, session: SessionState):
+        with Session(engine) as db:
+            statement = select(SessionDBModel).where(
+                SessionDBModel.session_id == session.session_id
+            )
+            result = db.exec(statement).first()
+
+            if result:
+                # Update the JSON blob and the timestamp
+                result.state = session.model_dump(mode="json")
+                result.updated_at = datetime.utcnow()
+                db.add(result)
+                db.commit()
+            else:
+                # Fallback if save() called on non-existent session
+                raise ValueError(f"Session {session.session_id} does not exist in DB.")
+
+    def delete(self, session_id: str) -> bool:
+        with Session(engine) as db:
+            statement = select(SessionDBModel).where(
+                SessionDBModel.session_id == session_id
+            )
+            result = db.exec(statement).first()
+
+            if result:
+                db.delete(result)
+                db.commit()
+                return True
+            return False
