@@ -12,6 +12,12 @@ from ..infrastructure.database.connection import engine
 
 
 class SessionRepository(ABC):
+    """
+    Defines how the application accesses sessions.
+    This allows us change how data is accessed (Memory -> SQL -> API) later
+    without changing the WorkflowEngine code.
+    """
+
     @abstractmethod
     def create(self) -> SessionState:
         """Creates a new empty session with a unique ID."""
