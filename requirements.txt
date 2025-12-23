@@ -6,3 +6,7 @@ pydantic-settings>=2.0.0
 # Web framework
 fastapi>=0.115.0
 uvicorn>=0.32.0
+
+# Database 
+sqlmodel
+psycopg2-binary
