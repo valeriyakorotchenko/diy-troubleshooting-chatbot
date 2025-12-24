@@ -20,11 +20,12 @@ from fastapi import Depends
 from ..config import settings
 from ..llm.interface import LLMProvider
 from ..llm.adapters.openai_adapter import OpenAIAdapter
-from ..repositories.workflow import WorkflowRepository, StaticWorkflowRepository
-from ..repositories.session import SessionRepository, InMemorySessionRepository
+from ..repositories.workflow import WorkflowRepository, PostgresWorkflowRepository
+from ..repositories.session import SessionRepository, PostgresSessionRepository
 from ..execution.engine import WorkflowEngine
 from ..services.workflow_router import WorkflowRouter, MockWorkflowRouter
 from ..services.chat import ChatService
+
 
 # LLM Provider (Singleton)
 @lru_cache()
@@ -42,13 +43,15 @@ def get_workflow_router() -> WorkflowRouter:
 # Workflow Repository (Singleton)
 @lru_cache()
 def get_workflow_repository() -> WorkflowRepository:
-    return StaticWorkflowRepository()
+    # return StaticWorkflowRepository()
+    return PostgresWorkflowRepository()
 
 # Session Repository (Singleton)
 # Note: In-memory storage must be a singleton so data persists across requests!
 @lru_cache()
 def get_session_repository() -> SessionRepository:
-    return InMemorySessionRepository()
+    # return InMemorySessionRepository()
+    return PostgresSessionRepository()
 
 # The Engine (Singleton Service)
 @lru_cache()
