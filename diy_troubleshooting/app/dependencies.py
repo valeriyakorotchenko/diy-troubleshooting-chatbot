@@ -20,13 +20,12 @@ from fastapi import Depends
 from ..config import settings
 from ..llm.interface import LLMProvider
 from ..llm.adapters.openai_adapter import OpenAIAdapter
-from ..repositories.workflow import WorkflowRepository, StaticWorkflowRepository, PostgresWorkflowRepository
-from ..repositories.session import SessionRepository, InMemorySessionRepository, PostgresSessionRepository
+from ..repositories.workflow import WorkflowRepository, PostgresWorkflowRepository
+from ..repositories.session import SessionRepository, PostgresSessionRepository
 from ..execution.engine import WorkflowEngine
 from ..services.workflow_router import WorkflowRouter, MockWorkflowRouter
 from ..services.chat import ChatService
 
-from ..infrastructure.database.connection import init_db
 
 # LLM Provider (Singleton)
 @lru_cache()
