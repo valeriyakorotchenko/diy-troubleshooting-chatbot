@@ -1,20 +1,12 @@
 ## Getting Started
 
-Follow these steps to set up the database and run the chatbot locally.
-
-### 1. Prerequisites
-
-* **Python 3.10+**
-* **Docker & Docker Compose** (Required for the PostgreSQL database)
-* **OpenAI API Key**
-
 Install the requirements. In the root directory, run:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Environment Configuration
+### Environment Configuration
 
 Create a `.env` file in the root directory of the project:
 
@@ -31,25 +23,25 @@ OPENAI_MODEL=gpt-4-turbo
 DATABASE_URL=postgresql://diy_user:diy_password@localhost:5432/diy_troubleshooting
 ```
 
-### 3. Database Setup
+### Database Setup
 
 We use Docker to run a local instance of PostgreSQL and a Python script to seed it with initial data.
 
-**Step A: Start the Database Container**
+**Start the Database Container**
 Run the following command to spin up the Postgres service in the background:
 ```bash
 docker-compose up -d
 ```
 *Wait a few seconds for the database to initialize.*
 
-**Step B: Seed the Database**
+**Seed the Database**
 Run the seeding script to create the tables and populate the hardcoded troubleshooting workflows (e.g., "Lukewarm Water"):
 ```bash
 python -m scripts.seed_db
 ```
 *Expected Output:* `Seeding Complete.`
 
-### 4. Running the Application
+### Running the Application
 
 Start the FastAPI server using Uvicorn:
 
@@ -59,7 +51,7 @@ uvicorn diy_troubleshooting.app.main:app --reload
 
 The API will be accessible at: `http://localhost:8000`
 
-### 5. Verification
+### Verification
 
 You can verify the setup by visiting the interactive Swagger UI documentation:
 **[http://localhost:8000/docs](http://localhost:8000/docs)**
