@@ -98,7 +98,13 @@ class PostgresSessionRepository(SessionRepository):
                 return None
 
             # Deserialize JSONB back into Pydantic Domain Model
-            return SessionState(**result.state)
+            session = SessionState(**result.state)
+            
+            # Inject the timestamp from the SQL column
+            # (Otherwise this field would just be the default 'now' from when we instantiated it above)
+            session.updated_at = result.updated_at
+
+            return session
 
     def save(self, session: SessionState):
         with Session(engine) as db:

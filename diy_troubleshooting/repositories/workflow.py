@@ -45,16 +45,13 @@ class PostgresWorkflowRepository(WorkflowRepository):
     """
     Reads from PostgreSQL 'workflows' table (JSONB).
     """
-
     def get_workflow(self, workflow_id: str) -> Workflow:
         with Session(engine) as db:
-            statement = select(WorkflowDBModel).where(
-                WorkflowDBModel.workflow_id == workflow_id
-            )
+            statement = select(WorkflowDBModel).where(WorkflowDBModel.workflow_id == workflow_id)
             result = db.exec(statement).first()
-
+            
             if not result:
                 raise ValueError(f"Workflow '{workflow_id}' not found in database.")
-
-            # Deserialize JSONB -> Pydantic
+            
+            # Recursively parse the entire JSON tree.
             return Workflow(**result.workflow_data)
