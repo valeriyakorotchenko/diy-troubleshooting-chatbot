@@ -9,7 +9,8 @@ and the API. It ensures that sessions are loaded, processed, and saved correctly
 import logging
 from typing import Optional
 
-from ..domain.models import Workflow
+from pydantic import BaseModel
+
 from ..state.models import Frame, SessionState
 from ..repositories.session import SessionRepository
 from ..repositories.workflow import WorkflowRepository
@@ -18,6 +19,19 @@ from ..schemas.decisions import StepDecision
 from .workflow_router import WorkflowRouter
 
 logger = logging.getLogger(__name__)
+
+
+class ChatTurnResult(BaseModel):
+    """
+    The outcome of a single conversation turn.
+    Contains the final reply, the status of the process, and the 
+    raw engine decision for logging/debugging.
+    """
+    reply: str
+    status: str
+    decision: Optional[StepDecision] # Optional to handle fallback/error cases
+    session_id: str
+
 
 class ChatService:
     def __init__(
@@ -57,36 +71,38 @@ class ChatService:
         5. Return Rich Response
         """
         
-        # 1. Load Session
+        # Load Session
         session = self.session_repo.get(session_id)
         if not session:
             raise ValueError(f"Session {session_id} not found")
 
-        # 2. Logic: Cold Start vs. Warm Start
+        # Logic: Cold Start vs. Warm Start
         if not session.stack:
             await self._handle_cold_start(session, user_text)
 
-        # 3. Execute Engine Turn
+        # Execute Engine Turn
         # If stack is STILL empty after cold start handling (Router found nothing),
         # we return a fallback response without invoking the engine.
         if not session.stack:
-            return {
-                "reply": "I'm sorry, I couldn't find a specific troubleshooting guide for that issue. Could you try describing it differently?",
-                "status": "FAILED",
-                "active_workflow": None
-            }
+            return ChatTurnResult(
+                reply="I'm sorry, I couldn't find a specific troubleshooting guide for that issue. Could you try describing it differently?",
+                status="FAILED",
+                decision=None,
+                session_id=session.session_id
+            )
 
         # Run the Engine
         decision = await self.engine.handle_message(session, user_text)
 
-        # 4. Save Session
+        # Save Session
         self.session_repo.save(session)
 
-        return {
-            "reply": decision.reply_to_user,
-            "status": decision.status,
-            "debug_info": None # todo: populate this field
-        }
+        return ChatTurnResult(
+                reply=decision.reply_to_user,
+                status=decision.status,
+                decision=decision,
+                session_id=session.session_id
+            )
 
     async def _handle_cold_start(self, session: SessionState, user_text: str):
         """
