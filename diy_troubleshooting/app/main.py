@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Depends
 
 from .dependencies import get_chat_service
 from ..services.chat import ChatService
+from ..services.exceptions import NoMatchingWorkflowError
 from .schemas import CreateSessionResponse, UserMessage, ChatResponse, DebugInfo
 
 
@@ -30,6 +31,11 @@ async def handle_message(
     """
     The main chat loop. Delegates entirely to the Service Layer.
     """
-    # The Service returns a Dict matching our ChatResponse schema structure
-    result = await service.process_message(session_id, message.text)
-    return result
+    try:
+        result = await service.process_message(session_id, message.text)
+        return result
+    except NoMatchingWorkflowError:
+        raise HTTPException(
+            status_code=422,
+            detail="No troubleshooting guide found for your issue. Try describing it differently."
+        )

@@ -16,6 +16,7 @@ from ..repositories.workflow import WorkflowRepository
 from ..execution.engine import WorkflowEngine
 from ..schemas.decisions import StepDecision
 from .workflow_router import WorkflowRouter
+from .exceptions import NoMatchingWorkflowError
 
 logger = logging.getLogger(__name__)
 
@@ -68,13 +69,11 @@ class ChatService:
 
         # 3. Execute Engine Turn
         # If stack is STILL empty after cold start handling (Router found nothing),
-        # we return a fallback response without invoking the engine.
+        # raise an exception so the API layer can return a proper HTTP error.
         if not session.stack:
-            return {
-                "reply": "I'm sorry, I couldn't find a specific troubleshooting guide for that issue. Could you try describing it differently?",
-                "status": "FAILED",
-                "active_workflow": None
-            }
+            raise NoMatchingWorkflowError(
+                "No troubleshooting guide found for the user's query"
+            )
 
         # Run the Engine
         decision = await self.engine.handle_message(session, user_text)
