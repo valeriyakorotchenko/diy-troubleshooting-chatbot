@@ -5,6 +5,7 @@ This module defines the runtime state model that tracks the user's journey
 through troubleshooting workflows. It implements a Call Stack pattern to
 support nested workflows (sub-routines) and maintains session-wide data slots.
 """
+from datetime import datetime
 
 from typing import List, Dict, Optional, Any, Literal
 from pydantic import BaseModel, Field
@@ -43,6 +44,7 @@ class SessionState(BaseModel):
     stack: List[Frame] = Field(default_factory=list)
     slots: Dict[str, Any] = Field(default_factory=dict)
     history: List[Message] = Field(default_factory=list)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     @property
     def active_frame(self) -> Optional[Frame]:
