@@ -2,12 +2,26 @@
 Domain Layer - Static Data Models
 
 This module defines the core domain model representing the static structure
-of troubleshooting guides. These dataclasses are derived from source content
+of troubleshooting guides. These classes are derived from source content
 (HTML guides) and define Workflows, Steps, and Links.
+
+-----------------------------------------------
+We use Pydantic here despite the DDD convention of keeping domain models
+framework-agnostic. This is a pragmatic tradeoff justified by:
+
+1. These models are structural definitions, not rich domain entities. They
+   contain no business logic — it lives in WorkflowEngine and StepExecutor.
+2. Pydantic's recursive parsing converts deeply nested JSON from the database
+   into validated Python objects in one line (Workflow → Step → Option/Media).
+3. Validation at deserialization catches malformed data at the infrastructure
+   boundary rather than at runtime when a user hits a broken step.
+
+Tradeoff: This couples the domain layer to Pydantic. If these models later
+require complex domain behavior, consider extracting a separate DTO layer.
 """
 
-from dataclasses import dataclass, field
 from typing import Literal, Optional, List, Dict
+from pydantic import BaseModel, Field
 
 """
 StepType classifies step behavior:
@@ -28,8 +42,7 @@ StepType = Literal[
 ]
 
 
-@dataclass
-class Media:
+class Media(BaseModel):
     """
     Visual aids extracted from source content.
 
@@ -42,8 +55,7 @@ class Media:
     caption: str
 
 
-@dataclass
-class WorkflowLink:
+class WorkflowLink(BaseModel):
     """
     Potential branch to another workflow (the "Smart Link").
 
@@ -61,11 +73,10 @@ class WorkflowLink:
     target_workflow_id: str
     title: str
     rationale: str
-    trigger_keywords: List[str] = field(default_factory=list)
+    trigger_keywords: List[str] = Field(default_factory=list)
 
 
-@dataclass
-class Option:
+class Option(BaseModel):
     """
     Logical outcome for a step (used when StepType is ask_choice).
 
@@ -83,8 +94,7 @@ class Option:
     next_step_id: str
 
 
-@dataclass
-class Step:
+class Step(BaseModel):
     """
     Fundamental unit of work in a troubleshooting workflow.
 
@@ -113,14 +123,13 @@ class Step:
     background_context: Optional[str] = None
     media: Optional[Media] = None
     warning: Optional[str] = None
-    suggested_links: List[WorkflowLink] = field(default_factory=list)
-    options: List[Option] = field(default_factory=list)
+    suggested_links: List[WorkflowLink] = Field(default_factory=list)
+    options: List[Option] = Field(default_factory=list)
     next_step: Optional[str] = None
     slot_name: Optional[str] = None
 
 
-@dataclass
-class Workflow:
+class Workflow(BaseModel):
     """
     Sequence of steps forming a complete troubleshooting guide.
 
@@ -134,6 +143,8 @@ class Workflow:
         steps: Dict mapping Step IDs to Step objects (O(1) lookup).
     """
     name: str
-    title: str
     start_step: str
-    steps: Dict[str, Step] = field(default_factory=dict)
+    steps: Dict[str, Step] = Field(default_factory=dict)
+    title: Optional[str] = None
+
+
