@@ -134,5 +134,6 @@ class Workflow:
         steps: Dict mapping Step IDs to Step objects (O(1) lookup).
     """
     name: str
+    title: str
     start_step: str
     steps: Dict[str, Step] = field(default_factory=dict)

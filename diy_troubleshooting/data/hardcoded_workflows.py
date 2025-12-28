@@ -180,6 +180,7 @@ end_consult_pro_complex = Step(
 
 lukewarm_workflow = Workflow(
     name="troubleshoot_lukewarm_water",
+    title="Fix Lukewarm Water",
     start_step="step_01_thermostat",
     steps={
         "step_01_thermostat": step_01,
