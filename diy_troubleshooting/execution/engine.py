@@ -59,11 +59,17 @@ class WorkflowEngine:
         if not session.active_frame:
             raise ValueError("Cannot handle message: session has no active workflow")
 
+        # The loop may execute multiple turns before returning to the user (e.g.,
+        # step completes → advance to next step → explain it). Each turn produces
+        # a reply, so we accumulate them here to join into one combined response.
         accumulated_reply = []
+
         current_input = user_input
         decision = None
 
-        for _ in range(3):  # Max turns
+        # Proactive loop: keeps executing until a step needs user input.           
+        for _ in range(3):  # Safety limit to prevent runaway loops
+            
             # Load Context
             active_frame, workflow_def, step_def = self._get_execution_context(session)
 
