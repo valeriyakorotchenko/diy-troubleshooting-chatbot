@@ -106,32 +106,18 @@ step_04 = Step(
     ],
     options=[
         Option(
-            id="hard_water_suspected",
-            label="User has hard water or suspects sediment build-up (tank is old, never been flushed, or area has hard water).",
-            next_step_id="step_04a_flush_tank"
+            id="sediment_buildup_detected",
+            label="User confirms that there is sediment build-up inside the water heater.",
+            next_step_id="end_sediment_resolved"
         ),
         Option(
             id="no_sediment_issue",
-            label="User does not have hard water issues, tank was recently flushed, or sediment is unlikely.",
+            label="User does not have hard water issues, tank was recently flushed, or sediment was not there after flushing the tank.",
             next_step_id="step_05_leak"
         ),
     ]
 )
 
-# --- STEP 4a: FLUSH TANK INSTRUCTION ---
-step_04a = Step(
-    id="step_04a_flush_tank",
-    type="instruction",
-    goal="Guide user to drain and flush the hot water tank to remove sediment build-up.",
-    background_context=(
-        "Resolve this problem by draining and flushing the hot water tank. Experienced DIYers "
-        "can generally handle this task on their own, but homeowners that lack experience will "
-        "likely need to call a plumber or a hot water heater technician to resolve this problem. "
-        "It's advised by Consumer Reports to schedule regular maintenance to help prevent this "
-        "problem and keep the hot water heater in top working condition."
-    ),
-    next_step="end_sediment_resolved"
-)
 
 # --- STEP 5: LEAK CHECK (From Section: "Leaking Hot Water Tank") ---
 step_05 = Step(
@@ -201,10 +187,6 @@ end_sediment_resolved = Step(
     id="end_sediment_resolved",
     type="end",
     goal="Close the session after advising on sediment removal via tank flush.",
-    background_context=(
-        "User has been advised to drain and flush the tank. Experienced DIYers can handle this, "
-        "others should call a professional. Regular maintenance prevents future sediment issues."
-    ),
 )
 
 end_call_pro_leak = Step(
@@ -273,45 +255,9 @@ drain_step_03 = Step(
         "Open the drain valve and let the tank empty (20-60 minutes for a full tank)."
     ),
     warning="The water will be HOT. Keep the hose secure and away from children and pets.",
-    next_step="drain_step_04_flush"
-)
-
-# --- DRAIN STEP 4: FLUSH (OPTIONAL) ---
-drain_step_04 = Step(
-    id="drain_step_04_flush",
-    type="ask_choice",
-    goal="Ask if user wants to flush the tank with fresh water.",
-    background_context=(
-        "For a more thorough cleaning, you can flush by briefly turning the cold water on "
-        "while the drain is open. This stirs up and flushes out any remaining debris."
-    ),
-    options=[
-        Option(
-            id="flush_yes",
-            label="User will flush the tank (turn water on briefly with drain open, repeat 2-3 times).",
-            next_step_id="drain_step_05_refill"
-        ),
-        Option(
-            id="flush_no",
-            label="User will skip flushing and proceed to refill.",
-            next_step_id="drain_step_05_refill"
-        ),
-    ]
-)
-
-# --- DRAIN STEP 5: REFILL AND RESTORE ---
-drain_step_05 = Step(
-    id="drain_step_05_refill",
-    type="instruction",
-    goal="Guide user to refill the tank and restore power.",
-    background_context=(
-        "Close the drain valve. Turn the cold water supply back on. "
-        "Wait at the open hot faucet until water flows steadily (no air sputtering). "
-        "Once full, restore power (flip breaker ON) or gas (turn valve ON, relight pilot if needed)."
-    ),
-    warning="Ensure the tank is FULL before restoring power to avoid damaging heating elements.",
     next_step="drain_end_success"
 )
+
 
 # --- DRAIN END: SUCCESS ---
 drain_end_success = Step(
@@ -319,10 +265,13 @@ drain_end_success = Step(
     type="end",
     goal="Confirm successful completion of the drain procedure.",
     background_context=(
-        "The tank has been drained and refilled. Water will take 30-60 minutes to heat up. "
-        "Consider scheduling this maintenance annually to keep the water heater in good condition."
+        "The tank has been drained."
     ),
 )
+
+# ==============================================================================
+# WORKFLOW DEFINITIONS
+# ==============================================================================
 
 drain_water_heater_workflow = Workflow(
     name="drain_water_heater",
@@ -332,15 +281,9 @@ drain_water_heater_workflow = Workflow(
         "drain_step_01_power_off": drain_step_01,
         "drain_step_02_water_off": drain_step_02,
         "drain_step_03_attach_hose": drain_step_03,
-        "drain_step_04_flush": drain_step_04,
-        "drain_step_05_refill": drain_step_05,
         "drain_end_success": drain_end_success,
     }
 )
-
-# ==============================================================================
-# WORKFLOW DEFINITIONS
-# ==============================================================================
 
 lukewarm_workflow = Workflow(
     name="troubleshoot_lukewarm_water",
@@ -352,7 +295,6 @@ lukewarm_workflow = Workflow(
         "step_02a_reset_breaker": step_02a,
         "step_03_demand": step_03,
         "step_04_sediment": step_04,
-        "step_04a_flush_tank": step_04a,
         "step_05_leak": step_05,
         "step_06_gas_smell": step_06,
         "end_success_thermostat": end_success_thermostat,
