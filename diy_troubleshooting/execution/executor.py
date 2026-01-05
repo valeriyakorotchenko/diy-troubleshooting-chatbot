@@ -98,6 +98,19 @@ class StepExecutor:
                 prompt += f"- ID: '{opt.id}' | Description: {opt.label}\n"
             prompt += "When status is COMPLETE, you MUST set 'result_value' to one of the IDs above.\n"
 
-        print(prompt)
+        # --- HELPER WORKFLOW LINKS (Branching to Sub-Workflows) ---
+        if step.suggested_links:
+            prompt += "\nAVAILABLE HELPER WORKFLOWS:\n"
+            prompt += "If the user explicitly asks for help with a related sub-task, you can branch to one of these workflows.\n"
+            for link in step.suggested_links:
+                prompt += f"- ID: '{link.target_workflow_id}' | Title: {link.title}\n"
+                prompt += f"  When to offer: {link.rationale}\n"
+            prompt += "\nTo branch to a helper workflow:\n"
+            prompt += "- Set status='CALL_WORKFLOW'\n"
+            prompt += "- Set result_value to the workflow ID\n"
+            prompt += "IMPORTANT: Only use CALL_WORKFLOW when the user clearly needs or requests the sub-task. "
+            prompt += "Do not proactively suggest branching unless the user is stuck.\n"
+
+        logger.debug(f"Built system prompt for step {step.id}")
 
         return prompt
