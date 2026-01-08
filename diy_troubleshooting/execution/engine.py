@@ -16,6 +16,8 @@ This avoids awkward concatenation of multiple independent LLM replies.
 import logging
 from typing import Tuple, Optional
 
+from diy_troubleshooting.repositories import session
+
 from ..state.models import SessionState, Frame, Message, WorkflowResult
 from ..domain.models import Workflow, Step, StepType, WorkflowLink
 from .schemas.decisions import StepStatus, StepDecision
@@ -67,9 +69,10 @@ class WorkflowEngine:
 
         # Determine final decision
         is_holding = fsm_transition == StateMachineTransition.HOLD
-        workflow_ended = not session.stack
+        root_workflow_ended = not session.stack
 
-        if is_holding or workflow_ended:
+        if is_holding or root_workflow_ended:
+            # We are staying on the current step or the session has ended
             final_decision = decision
         else:
             # We transitioned to a new step or workflow — generate a coherent message that
@@ -110,9 +113,16 @@ class WorkflowEngine:
         if decision.status in (StepStatus.IN_PROGRESS, StepStatus.GIVE_UP):
             return StateMachineTransition.HOLD
 
-        # ADVANCE or POP: Resolve next step, then mutate accordingly
+        # POP or ADVANCE: Check if current step is END, otherwise advance
         if decision.status == StepStatus.COMPLETE:
             current_step = workflow.steps[frame.current_step_id]
+
+            # If the current step is END, the workflow is complete — pop the frame
+            if current_step.type == StepType.END:
+                self._pop_frame(session, workflow, decision)
+                return StateMachineTransition.POP
+
+            # Otherwise, resolve and advance to the next step
             next_step_id = self._resolve_next_step_id(current_step, decision)
 
             if next_step_id is None:
@@ -124,11 +134,6 @@ class WorkflowEngine:
                 raise ValueError(
                     f"Step '{current_step.id}' references non-existent next step '{next_step_id}'"
                 )
-
-            next_step = workflow.steps[next_step_id]
-            if next_step.type == StepType.END:
-                self._pop_frame(session, workflow, decision)
-                return StateMachineTransition.POP
 
             frame.current_step_id = next_step_id
             return StateMachineTransition.ADVANCE
