@@ -13,7 +13,7 @@ from ..domain.models import Step
 from ..state.models import Frame, Message
 from .schemas.decisions import StepDecision
 from ..llm.interface import LLMProvider
-from .prompts.step_execution import build_step_execution_prompt
+from .prompts import render, Template
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,11 @@ class StepExecutor:
         Helps the user work toward the step's goal and generates an
         appropriate response. Determines if the goal has been achieved.
         """
-        system_prompt = build_step_execution_prompt(step, frame)
+        system_prompt = render(
+            Template.STEP_EXECUTION,
+            step=step,
+            mailbox=frame.pending_child_result,
+        )
 
         # Prepare Messages (System + History + New Input)
         # Convert our Message objects to OpenAI format.

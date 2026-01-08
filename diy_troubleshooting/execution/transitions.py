@@ -14,7 +14,7 @@ from ..state.models import Message
 from .schemas.decisions import StepDecision, StepStatus
 from ..llm.interface import LLMProvider
 from .schemas.state_machine import TransitionMeta
-from .prompts.step_introduction import build_step_introduction_prompt
+from .prompts import render, Template
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,12 @@ async def introduce_step(
     Returns:
         StepDecision for to_step with IN_PROGRESS status.
     """
-    system_prompt = build_step_introduction_prompt(from_step, to_step, meta)
+    system_prompt = render(
+        Template.STEP_INTRODUCTION,
+        from_step=from_step,
+        to_step=to_step,
+        meta=meta,
+    )
 
     messages = [{"role": "system", "content": system_prompt}]
     for msg in history:
