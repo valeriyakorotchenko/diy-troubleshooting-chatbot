@@ -6,9 +6,9 @@ maintains process flow, manages the call stack, and delegates step
 execution to the StepExecutor ("The Worker").
 
 Response Strategy:
-- HOLD (no transition): Return StepExecutor's StepDecision for current step
-- Transition (ADVANCE/PUSH/POP): Return new current step's StepDecision,
-  with a smooth transition message generated using the previous step's context
+- HOLD or workflow ended: Return StepExecutor's decision as-is
+- Transition (ADVANCE/PUSH/POP): Generate a new decision with a smooth
+  transition message bridging the previous step to the new step
 
 This avoids awkward concatenation of multiple independent LLM replies.
 """
@@ -17,7 +17,7 @@ import logging
 from typing import Tuple, Optional
 
 from ..state.models import SessionState, Frame, Message, WorkflowResult
-from ..domain.models import Workflow, Step, WorkflowLink
+from ..domain.models import Workflow, Step, StepType, WorkflowLink
 from .schemas.decisions import StepStatus, StepDecision
 from ..repositories.workflow import WorkflowRepository
 from ..llm.interface import LLMProvider
@@ -41,13 +41,15 @@ class WorkflowEngine:
 
         Evaluates the current step, applies state transitions, and generates
         a response. For transitions (ADVANCE/PUSH/POP), uses introduce_step()
-        to create a unified message instead of concatenating multiple replies.
+        to create a unified, coherent message instead of concatenating multiple replies.
         """
         if not session.active_frame:
             raise ValueError("Cannot handle message: session has no active workflow")
 
-        # Delegate to StepExecutor: get LLM's assessment of user input against current step's goal
+        # Load context
         frame, workflow, current_step = self._get_execution_context(session)
+
+        # Delegate to StepExecutor: get LLM's assessment of user input against current step's goal
         decision = await self._execute_step(
             active_frame=frame,
             step_def=current_step,
@@ -59,21 +61,30 @@ class WorkflowEngine:
         # MUTATES: session.stack, frame.current_step_id
         fsm_transition = self._apply_decision(session, frame, workflow, decision)
 
-        # Generate response
+        # Clear the child result mailbox now that we've processed it
+        if session.active_frame:
+            session.active_frame.pending_child_result = None
+
+        # Determine final decision
         is_holding = fsm_transition == StateMachineTransition.HOLD
         workflow_ended = not session.stack
 
         if is_holding or workflow_ended:
-            return self._return_direct_response(session, user_input, decision)
+            final_decision = decision
+        else:
+            # We transitioned to a new step or workflow — generate a coherent message that
+            # acknowledges the previous step and introduces the new one, avoiding
+            # awkward concatenation of two independent LLM replies
+            final_decision = await self._generate_transition_decision(
+                session=session,
+                previous_step=current_step,
+                transition=fsm_transition,
+                decision=decision,
+                user_input=user_input,
+            )
 
-        # Transitioned: return new step's StepDecision with smooth transition message
-        return await self._generate_transition_response(
-            session=session,
-            previous_step=current_step,
-            transition=fsm_transition,
-            decision=decision,
-            user_input=user_input,
-        )
+        self._update_history(session, user_input, final_decision.reply_to_user)
+        return final_decision
 
     # ==========================================================================
     # State Mutation & Translation (The Core Logic)
@@ -87,18 +98,21 @@ class WorkflowEngine:
         decision: StepDecision,
     ) -> StateMachineTransition:
         """
-        Mutates the session state AND translates the StepDecision into a StateMachineTransition.
+        Translate a StepDecision into a StateMachineTransition.
+
+        IMPORTANT: This method mutates session state as a side effect:
+        - HOLD: No mutation
+        - ADVANCE: Updates frame.current_step_id
+        - PUSH: Appends new Frame to session.stack
+        - POP: Removes Frame from session.stack, may set parent's pending_child_result
         """
         # Case 1: Hold State (Stay on Current Step)
-        if decision.status == StepStatus.IN_PROGRESS:
-            return StateMachineTransition.HOLD
-
-        if decision.status == StepStatus.GIVE_UP:
+        if decision.status in (StepStatus.IN_PROGRESS, StepStatus.GIVE_UP):
             return StateMachineTransition.HOLD
 
         # Case 2: Advance to Next Step
         if decision.status == StepStatus.COMPLETE:
-            return self._advance_or_pop(session, frame, workflow, decision)
+            return self._handle_step_completion(session, frame, workflow, decision)
 
         # Case 3: Branch to Child Workflow
         if decision.status == StepStatus.CALL_WORKFLOW:
@@ -115,7 +129,7 @@ class WorkflowEngine:
         logger.warning(f"Unknown StepStatus received: {decision.status}")
         return StateMachineTransition.HOLD
 
-    def _advance_or_pop(
+    def _handle_step_completion(
         self,
         session: SessionState,
         frame: Frame,
@@ -123,36 +137,48 @@ class WorkflowEngine:
         decision: StepDecision,
     ) -> StateMachineTransition:
         """
-        Resolves the next step and advances to it, or pops the frame if workflow ends.
+        Handle step completion: advance to the next step or pop the frame if workflow ends.
         """
-        # Resolve Next Step ID
         current_step = workflow.steps[frame.current_step_id]
-        next_step_id = None
+        next_step_id = self._resolve_next_step_id(current_step, decision)
 
-        if current_step.type == "ask_choice" and current_step.options:
-            selected_option = next(
-                (
-                    opt
-                    for opt in current_step.options
-                    if opt.id == decision.result_value
-                ),
-                None,
+        if next_step_id is None:
+            raise ValueError(
+                f"Step '{current_step.id}' has no next_step defined and no matching option "
+                f"for result_value '{decision.result_value}'"
             )
-            next_step_id = (
-                selected_option.next_step_id
-                if selected_option
-                else current_step.next_step
-            )
-        else:
-            next_step_id = current_step.next_step
 
-        # Mutate State & Return FSM Transition Type
-        next_step_def = workflow.steps[next_step_id]  # Fail fast if malformed
-        if next_step_def.type == "end":
+        if next_step_id not in workflow.steps:
+            raise ValueError(
+                f"Step '{current_step.id}' references non-existent next step '{next_step_id}'"
+            )
+
+        next_step_def = workflow.steps[next_step_id]
+        if next_step_def.type == StepType.END:
             return self._pop_frame(session, workflow, decision)
 
         frame.current_step_id = next_step_id
         return StateMachineTransition.ADVANCE
+
+    def _resolve_next_step_id(
+        self, current_step: Step, decision: StepDecision
+    ) -> Optional[str]:
+        """
+        Determine the next step ID based on step type and decision.
+
+        For 'ask_choice' steps, uses the selected option's next_step_id.
+        For other steps, uses the step's default next_step.
+        """
+        if current_step.type == "ask_choice" and current_step.options:
+            selected_option = next(
+                (opt for opt in current_step.options if opt.id == decision.result_value),
+                None,
+            )
+            if selected_option:
+                return selected_option.next_step_id
+            # Fall through to default next_step if no option matched
+
+        return current_step.next_step
 
     def _pop_frame(
         self,
@@ -200,19 +226,7 @@ class WorkflowEngine:
     # Response Generation
     # ==========================================================================
 
-    def _return_direct_response(
-        self,
-        session: SessionState,
-        user_input: str,
-        decision: StepDecision,
-    ) -> StepDecision:
-        """Return executor's reply directly when staying on the current step."""
-        if session.active_frame:
-            session.active_frame.pending_child_result = None
-        self._update_history(session, user_input, decision.reply_to_user)
-        return decision
-
-    async def _generate_transition_response(
+    async def _generate_transition_decision(
         self,
         session: SessionState,
         previous_step: Step,
@@ -221,11 +235,10 @@ class WorkflowEngine:
         user_input: str,
     ) -> StepDecision:
         """
-        Produce a StepDecision for the new current step after a transition.
+        Generate a StepDecision that introduces the new step after a transition.
 
         Uses context from the previous step to generate a smooth transition message.
         """
-        # Re-fetch context—now pointing to the NEW step after mutation
         new_frame, _, next_step = self._get_execution_context(session)
 
         meta = TransitionMeta(
@@ -235,7 +248,7 @@ class WorkflowEngine:
             child_result=new_frame.pending_child_result,
         )
 
-        intro_decision = await introduce_step(
+        return await introduce_step(
             llm=self.llm_provider,
             from_step=previous_step,
             to_step=next_step,
@@ -243,10 +256,6 @@ class WorkflowEngine:
             history=session.history,
             user_input=user_input,
         )
-
-        new_frame.pending_child_result = None
-        self._update_history(session, user_input, intro_decision.reply_to_user)
-        return intro_decision
 
     # ==========================================================================
     # Standard Helpers
@@ -263,11 +272,7 @@ class WorkflowEngine:
         return active_frame, workflow_def, step_def
 
     def _workflow_exists(self, workflow_id: str) -> bool:
-        try:
-            self.repository.get_workflow(workflow_id)
-            return True
-        except Exception:
-            return False
+        return self.repository.workflow_exists(workflow_id)
 
     async def _execute_step(
         self,

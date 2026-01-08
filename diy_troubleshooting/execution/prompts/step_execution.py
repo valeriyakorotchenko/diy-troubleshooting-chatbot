@@ -6,7 +6,7 @@ The LLM helps the user work toward the step's goal, provides guidance,
 and determines when the goal has been achieved.
 """
 
-from ...domain.models import Step
+from ...domain.models import Step, StepType
 from ...state.models import Frame
 
 # =============================================================================
@@ -97,7 +97,7 @@ def _build_mailbox_block(frame: Frame) -> str:
 
 def _build_options_block(step: Step) -> str:
     """Build the valid outcomes block for ask_choice steps."""
-    if step.type != "ask_choice" or not step.options:
+    if step.type != StepType.ASK_CHOICE or not step.options:
         return ""
     option_lines = [
         OPTION_LINE.format(id=opt.id, label=opt.label)
