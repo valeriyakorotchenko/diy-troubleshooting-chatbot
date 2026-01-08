@@ -98,23 +98,42 @@ class WorkflowEngine:
         decision: StepDecision,
     ) -> StateMachineTransition:
         """
-        Translate a StepDecision into a StateMachineTransition.
+        Apply a StepDecision to the session state and return the transition type.
 
-        IMPORTANT: This method mutates session state as a side effect:
+        Mutates session state based on the decision:
         - HOLD: No mutation
         - ADVANCE: Updates frame.current_step_id
         - PUSH: Appends new Frame to session.stack
-        - POP: Removes Frame from session.stack, may set parent's pending_child_result
+        - POP: Removes Frame from session.stack, delivers result to parent
         """
-        # Case 1: Hold State (Stay on Current Step)
+        # HOLD: Stay on current step (no mutation)
         if decision.status in (StepStatus.IN_PROGRESS, StepStatus.GIVE_UP):
             return StateMachineTransition.HOLD
 
-        # Case 2: Advance to Next Step
+        # ADVANCE or POP: Resolve next step, then mutate accordingly
         if decision.status == StepStatus.COMPLETE:
-            return self._handle_step_completion(session, frame, workflow, decision)
+            current_step = workflow.steps[frame.current_step_id]
+            next_step_id = self._resolve_next_step_id(current_step, decision)
 
-        # Case 3: Branch to Child Workflow
+            if next_step_id is None:
+                raise ValueError(
+                    f"Step '{current_step.id}' has no next_step defined and no matching option "
+                    f"for result_value '{decision.result_value}'"
+                )
+            if next_step_id not in workflow.steps:
+                raise ValueError(
+                    f"Step '{current_step.id}' references non-existent next step '{next_step_id}'"
+                )
+
+            next_step = workflow.steps[next_step_id]
+            if next_step.type == StepType.END:
+                self._pop_frame(session, workflow, decision)
+                return StateMachineTransition.POP
+
+            frame.current_step_id = next_step_id
+            return StateMachineTransition.ADVANCE
+
+        # PUSH: Validate and push child workflow onto stack
         if decision.status == StepStatus.CALL_WORKFLOW:
             target_workflow_id = decision.result_value
             if not target_workflow_id:
@@ -123,42 +142,13 @@ class WorkflowEngine:
             if not self._workflow_exists(target_workflow_id):
                 logger.warning(f"CALL_WORKFLOW target not found: {target_workflow_id}")
                 return StateMachineTransition.HOLD
-            return self._push_child_workflow(session, target_workflow_id)
 
-        # Fallback: Unknown status, hold state unchanged and wait for user's input
+            self._push_child_workflow(session, target_workflow_id)
+            return StateMachineTransition.PUSH
+
+        # Unknown status: log warning and hold
         logger.warning(f"Unknown StepStatus received: {decision.status}")
         return StateMachineTransition.HOLD
-
-    def _handle_step_completion(
-        self,
-        session: SessionState,
-        frame: Frame,
-        workflow: Workflow,
-        decision: StepDecision,
-    ) -> StateMachineTransition:
-        """
-        Handle step completion: advance to the next step or pop the frame if workflow ends.
-        """
-        current_step = workflow.steps[frame.current_step_id]
-        next_step_id = self._resolve_next_step_id(current_step, decision)
-
-        if next_step_id is None:
-            raise ValueError(
-                f"Step '{current_step.id}' has no next_step defined and no matching option "
-                f"for result_value '{decision.result_value}'"
-            )
-
-        if next_step_id not in workflow.steps:
-            raise ValueError(
-                f"Step '{current_step.id}' references non-existent next step '{next_step_id}'"
-            )
-
-        next_step_def = workflow.steps[next_step_id]
-        if next_step_def.type == StepType.END:
-            return self._pop_frame(session, workflow, decision)
-
-        frame.current_step_id = next_step_id
-        return StateMachineTransition.ADVANCE
 
     def _resolve_next_step_id(
         self, current_step: Step, decision: StepDecision
@@ -185,32 +175,29 @@ class WorkflowEngine:
         session: SessionState,
         completed_workflow: Workflow,
         final_decision: StepDecision,
-    ) -> StateMachineTransition:
+    ) -> None:
         """
-        Pops the current frame. If a parent frame exists, delivers the result to its mailbox.
+        Pop the current frame. If a parent frame exists, deliver the result to its mailbox.
         """
         session.stack.pop()
 
-        # If there's a parent frame waiting, deliver the child's result
         if session.stack:
             parent_frame = session.stack[-1]
             parent_frame.pending_child_result = WorkflowResult(
                 source_workflow_id=completed_workflow.name,
                 status="SUCCESS",
                 summary=final_decision.reply_to_user,
-                slots_collected={},  # Slots are session-wide, not frame-specific
+                slots_collected={},
             )
             logger.info(f"Child workflow '{completed_workflow.name}' completed, result delivered to parent")
-
-        return StateMachineTransition.POP
 
     def _push_child_workflow(
         self,
         session: SessionState,
         target_workflow_id: str,
-    ) -> StateMachineTransition:
+    ) -> None:
         """
-        Pushes a new frame for the child workflow onto the stack.
+        Push a new frame for the child workflow onto the stack.
         """
         target_workflow = self.repository.get_workflow(target_workflow_id)
         child_frame = Frame(
@@ -219,8 +206,6 @@ class WorkflowEngine:
         )
         session.stack.append(child_frame)
         logger.info(f"Pushed child workflow: {target_workflow_id}")
-
-        return StateMachineTransition.PUSH
 
     # ==========================================================================
     # Response Generation
