@@ -1,4 +1,4 @@
-from diy_troubleshooting.domain.models import Workflow, Step, Option, WorkflowLink
+from diy_troubleshooting.domain.models import Workflow, Step, StepType, Option, WorkflowLink
 
 # ==============================================================================
 # STEP DEFINITIONS
@@ -7,7 +7,7 @@ from diy_troubleshooting.domain.models import Workflow, Step, Option, WorkflowLi
 # --- STEP 1: THERMOSTAT (From Section: "Check and Adjust the Thermostat") ---
 step_01 = Step(
     id="step_01_thermostat",
-    type="ask_choice",
+    type=StepType.ASK_CHOICE,
     goal="Instruct user to check the thermostat dial. Determine if adjusting it fixes the issue.",
     background_context=(
         "The thermostat is on the hot water tank. It can get bumped accidently. "
@@ -31,7 +31,7 @@ step_01 = Step(
 # --- STEP 2: BREAKER (From Section: "Tripped Hot Water Tank Breaker") ---
 step_02 = Step(
     id="step_02_breaker",
-    type="ask_choice",
+    type=StepType.ASK_CHOICE,
     goal="Check if the circuit breaker is tripped.",
     background_context=(
         "Electric tanks need power. Power surges can trip the breaker. "
@@ -54,7 +54,7 @@ step_02 = Step(
 # --- STEP 2a: RESET BREAKER INSTRUCTION ---
 step_02a = Step(
     id="step_02a_reset_breaker",
-    type="instruction",
+    type=StepType.INSTRUCTION,
     goal="Guide user to reset the breaker and test.",
     background_context="Flip to OFF, then firmly back to ON. Wait an hour or so to see if the water heats up. If it trips again immediately, you have an electrical short.",
     next_step="end_monitor"
@@ -63,7 +63,7 @@ step_02a = Step(
 # --- STEP 3: HIGH DEMAND (From Section: "Unmanageable Hot Water Demand") ---
 step_03 = Step(
     id="step_03_demand",
-    type="ask_choice",
+    type=StepType.ASK_CHOICE,
     goal="Determine if the household simply used up all the hot water temporarily.",
     background_context=(
         "Running laundry, dishwasher, and showers simultaneously depletes the tank. "
@@ -86,7 +86,7 @@ step_03 = Step(
 # --- STEP 4: SEDIMENT BUILD-UP (From Section: "Sediment Build-Up") ---
 step_04 = Step(
     id="step_04_sediment",
-    type="ask_choice",
+    type=StepType.ASK_CHOICE,
     goal="Determine if sediment build-up is blocking the heat transfer.",
     background_context=(
         "Over time, minerals in the water "
@@ -122,7 +122,7 @@ step_04 = Step(
 # --- STEP 5: LEAK CHECK (From Section: "Leaking Hot Water Tank") ---
 step_05 = Step(
     id="step_05_leak",
-    type="ask_choice",
+    type=StepType.ASK_CHOICE,
     goal="Check for visible leaks around the tank.",
     background_context="Leaks reduce pressure and temperature. They are a major safety/damage risk.",
     warning="If you see a leak, turn off the water supply immediately to prevent damage.",
@@ -143,7 +143,7 @@ step_05 = Step(
 # --- STEP 6: GAS SAFETY CHECK (From Section: "Broken Gas Valve") ---
 step_06 = Step(
     id="step_06_gas_smell",
-    type="ask_choice",
+    type=StepType.ASK_CHOICE,
     goal="Safety check for gas leaks before suggesting internal repairs.",
     background_context="Rotten egg smell indicates a gas leak. This is an emergency.",
     warning="If you smell gas, leave the home and call 911/Gas Company.",
@@ -167,37 +167,37 @@ step_06 = Step(
 
 end_success_thermostat = Step(
     id="end_success_thermostat",
-    type="end",
+    type=StepType.END,
     goal="Close the session after a successful fix.",
 )
 
 end_monitor = Step(
     id="end_monitor",
-    type="end",
+    type=StepType.END,
     goal="Close the session but advise monitoring.",
 )
 
 end_wait_recovery = Step(
     id="end_wait_recovery",
-    type="end",
+    type=StepType.END,
     goal="Explain that the tank just needs to refill/reheat.",
 )
 
 end_sediment_resolved = Step(
     id="end_sediment_resolved",
-    type="end",
+    type=StepType.END,
     goal="Close the session after advising on sediment removal via tank flush.",
 )
 
 end_call_pro_leak = Step(
     id="end_call_pro_leak",
-    type="end",
+    type=StepType.END,
     goal="Urgent referral for a leak.",
 )
 
 end_emergency_gas = Step(
     id="end_emergency_gas",
-    type="end",
+    type=StepType.END,
     goal="Emergency exit protocol.",
     warning="LEAVE THE HOME IMMEDIATELY.",
 )
@@ -206,7 +206,7 @@ end_emergency_gas = Step(
 # Sediment has its own diagnostic branch now. Remaining complex causes are grouped here.
 end_consult_pro_complex = Step(
     id="end_consult_pro_complex",
-    type="end",
+    type=StepType.END,
     goal="Refer user to a pro for complex internal diagnostics.",
     background_context=(
         "Remaining causes: Broken Dip Tube or Faulty Heating Elements. "
@@ -221,7 +221,7 @@ end_consult_pro_complex = Step(
 # --- DRAIN STEP 1: TURN OFF POWER/GAS ---
 drain_step_01 = Step(
     id="drain_step_01_power_off",
-    type="instruction",
+    type=StepType.INSTRUCTION,
     goal="Guide user to turn off power or gas to the water heater.",
     background_context=(
         "For electric heaters: flip the circuit breaker to OFF. "
@@ -235,7 +235,7 @@ drain_step_01 = Step(
 # --- DRAIN STEP 2: TURN OFF WATER SUPPLY ---
 drain_step_02 = Step(
     id="drain_step_02_water_off",
-    type="instruction",
+    type=StepType.INSTRUCTION,
     goal="Guide user to shut off the cold water supply.",
     background_context=(
         "Find the cold water inlet valve at the top of the heater. Turn it clockwise to close. "
@@ -247,7 +247,7 @@ drain_step_02 = Step(
 # --- DRAIN STEP 3: ATTACH HOSE AND DRAIN ---
 drain_step_03 = Step(
     id="drain_step_03_attach_hose",
-    type="instruction",
+    type=StepType.INSTRUCTION,
     goal="Guide user to connect a hose and drain the tank.",
     background_context=(
         "Connect a garden hose to the drain valve near the bottom of the tank. "
@@ -262,7 +262,7 @@ drain_step_03 = Step(
 # --- DRAIN END: SUCCESS ---
 drain_end_success = Step(
     id="drain_end_success",
-    type="end",
+    type=StepType.END,
     goal="Confirm successful completion of the drain procedure.",
     background_context=(
         "The tank has been drained."
