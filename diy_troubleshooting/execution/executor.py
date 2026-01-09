@@ -43,7 +43,7 @@ class StepExecutor:
         )
 
         # Prepare Messages (System + History + New Input)
-        # Convert our Message objects to OpenAI format.
+        # The role/content dict format is an industry standard across LLM providers.
         messages = [{"role": "system", "content": system_prompt}]
         for msg in history:
             messages.append({"role": msg.role, "content": msg.content})
