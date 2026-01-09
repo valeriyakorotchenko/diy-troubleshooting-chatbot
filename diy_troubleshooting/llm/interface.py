@@ -1,6 +1,7 @@
-from typing import List, Type, TypeVar
-from pydantic import BaseModel
 from abc import ABC, abstractmethod
+from typing import List, Type, TypeVar
+
+from pydantic import BaseModel
 
 # Generic type for the Pydantic model we expect back
 T = TypeVar("T", bound=BaseModel)

@@ -10,10 +10,10 @@ import logging
 from typing import List
 
 from ..domain.models import Step
-from ..state.models import Frame, Message
-from .schemas.decisions import StepDecision
 from ..llm.interface import LLMProvider
-from .prompts import render, Template
+from ..state.models import Frame, Message
+from .prompts import Template, render
+from .schemas.decisions import StepDecision
 
 logger = logging.getLogger(__name__)
 

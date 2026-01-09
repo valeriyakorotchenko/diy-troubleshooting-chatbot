@@ -5,8 +5,8 @@ Loads .jinja2 templates from the templates directory and renders them
 with provided context variables.
 """
 
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 

@@ -1,4 +1,4 @@
-from diy_troubleshooting.domain.models import Workflow, Step, StepType, Option, WorkflowLink
+from diy_troubleshooting.domain.models import Option, Step, StepType, Workflow, WorkflowLink
 
 # ==============================================================================
 # STEP DEFINITIONS

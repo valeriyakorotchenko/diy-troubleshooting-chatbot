@@ -1,9 +1,10 @@
 from typing import List, Type, TypeVar
+
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from ..interface import LLMProvider
 from ...config import settings
+from ..interface import LLMProvider
 
 T = TypeVar("T", bound=BaseModel)
 

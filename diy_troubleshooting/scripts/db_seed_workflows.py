@@ -7,8 +7,8 @@ hardcoded workflows defined in data/hardcoded_workflows.py.
 Usage:
     python -m scripts.seed_db
 """
-import sys
 import os
+import sys
 from dataclasses import asdict
 
 # Ensure the project root is in python path
@@ -17,9 +17,9 @@ sys.path.append(os.getcwd())
 from fastapi.encoders import jsonable_encoder
 from sqlmodel import Session, select
 
+from diy_troubleshooting.data.hardcoded_workflows import HARDCODED_WORKFLOWS
 from diy_troubleshooting.infrastructure.database.connection import engine, init_db
 from diy_troubleshooting.infrastructure.database.tables import WorkflowDBModel
-from diy_troubleshooting.data.hardcoded_workflows import HARDCODED_WORKFLOWS
 
 def seed_workflows():
     print("Initializing Database Connection...")

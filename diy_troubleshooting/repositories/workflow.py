@@ -3,10 +3,10 @@ from typing import Dict
 
 from sqlmodel import Session, select
 
-from ..domain.models import Workflow
-from ..infrastructure.database.tables import WorkflowDBModel
-from ..infrastructure.database.connection import engine
 from ..data.hardcoded_workflows import HARDCODED_WORKFLOWS
+from ..domain.models import Workflow
+from ..infrastructure.database.connection import engine
+from ..infrastructure.database.tables import WorkflowDBModel
 
 
 # The Interface

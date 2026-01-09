@@ -1,14 +1,13 @@
 import uuid
 from abc import ABC, abstractmethod
-from typing import Optional, Dict
 from datetime import datetime
+from typing import Dict, Optional
 
 from sqlmodel import Session, select
 
-# Domain & Infra Imports
-from ..state.models import SessionState
-from ..infrastructure.database.tables import SessionDBModel
 from ..infrastructure.database.connection import engine
+from ..infrastructure.database.tables import SessionDBModel
+from ..state.models import SessionState
 
 
 class SessionRepository(ABC):

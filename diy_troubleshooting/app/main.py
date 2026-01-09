@@ -1,14 +1,14 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import Response
 
-from .dependencies import get_chat_service
 from ..services.chat import ChatService
+from .dependencies import get_chat_service
 from .schemas import (
-    CreateSessionResponse, 
-    UserMessage, 
     ChatMessage,
-    ChatResponse, 
-    SessionRead
+    ChatResponse,
+    CreateSessionResponse,
+    SessionRead,
+    UserMessage,
 )
 
 app = FastAPI(title="DIY Agentic Chatbot")

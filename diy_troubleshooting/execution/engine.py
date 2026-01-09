@@ -14,16 +14,14 @@ This avoids awkward concatenation of multiple independent LLM replies.
 """
 
 import logging
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
-from diy_troubleshooting.repositories import session
-
-from ..state.models import SessionState, Frame, Message, WorkflowResult
-from ..domain.models import Workflow, Step, StepType, WorkflowLink
-from .schemas.decisions import StepStatus, StepDecision
-from ..repositories.workflow import WorkflowRepository
+from ..domain.models import Step, StepType, Workflow, WorkflowLink
 from ..llm.interface import LLMProvider
+from ..repositories.workflow import WorkflowRepository
+from ..state.models import Frame, Message, SessionState, WorkflowResult
 from .executor import StepExecutor
+from .schemas.decisions import StepDecision, StepStatus
 from .schemas.state_machine import StateMachineTransition, TransitionMeta
 from .transitions import introduce_step
 

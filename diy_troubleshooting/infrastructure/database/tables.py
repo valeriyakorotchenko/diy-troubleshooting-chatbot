@@ -10,9 +10,9 @@ from datetime import datetime
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
-from sqlmodel import SQLModel, Field
 from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlmodel import Field, SQLModel
 
 
 class SessionDBModel(SQLModel, table=True):
