@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowEngine:
-    def __init__(self, repository: WorkflowRepository, llm_provider: LLMProvider):
-        self._repository = repository
+    def __init__(self, workflow_repository: WorkflowRepository, llm_provider: LLMProvider):
+        self._workflow_repository = workflow_repository
         self._llm_provider = llm_provider
 
     async def handle_message(
@@ -204,7 +204,7 @@ class WorkflowEngine:
         """
         Push a new frame for the child workflow onto the stack.
         """
-        target_workflow = self._repository.get_workflow(target_workflow_id)
+        target_workflow = self._workflow_repository.get_workflow(target_workflow_id)
         child_frame = Frame(
             workflow_name=target_workflow_id,
             current_step_id=target_workflow.start_step,
@@ -257,12 +257,12 @@ class WorkflowEngine:
         active_frame = session.active_frame
         if not active_frame:
             raise ValueError("Session stack is empty.")
-        workflow_def = self._repository.get_workflow(active_frame.workflow_name)
+        workflow_def = self._workflow_repository.get_workflow(active_frame.workflow_name)
         step_def = workflow_def.steps[active_frame.current_step_id]
         return active_frame, workflow_def, step_def
 
     def _workflow_exists(self, workflow_id: str) -> bool:
-        return self._repository.workflow_exists(workflow_id)
+        return self._workflow_repository.workflow_exists(workflow_id)
 
     async def _execute_step(
         self,

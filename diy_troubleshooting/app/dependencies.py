@@ -57,9 +57,9 @@ def get_session_repository() -> SessionRepository:
 @lru_cache()
 def get_workflow_engine(
     llm: LLMProvider = Depends(get_llm_provider),
-    repo: WorkflowRepository = Depends(get_workflow_repository)
+    workflow_repo: WorkflowRepository = Depends(get_workflow_repository)
 ) -> WorkflowEngine:
-    return WorkflowEngine(repository=repo, llm_provider=llm)
+    return WorkflowEngine(workflow_repository=workflow_repo, llm_provider=llm)
  
 # The Chat Service (Singleton Service)
 @lru_cache()
