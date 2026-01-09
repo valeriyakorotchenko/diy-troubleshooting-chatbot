@@ -71,18 +71,17 @@ class ChatService:
         5. Return Rich Response
         """
         
-        # Load Session
+        # Load the session from the repository.
         session = self._session_repo.get(session_id)
         if not session:
             raise ValueError(f"Session {session_id} not found")
 
-        # Logic: Cold Start vs. Warm Start
+        # Handle cold start if no workflow is active yet.
         if not session.stack:
             await self._handle_cold_start(session, user_text)
 
-        # Execute Engine Turn
-        # If stack is STILL empty after cold start handling (Router found nothing),
-        # we return a fallback response without invoking the engine.
+        # If the stack is still empty after cold start handling (router found nothing),
+        # return a fallback response without invoking the engine.
         if not session.stack:
             return ChatTurnResult(
                 reply="I'm sorry, I couldn't find a specific troubleshooting guide for that issue. Could you try describing it differently?",
@@ -91,10 +90,10 @@ class ChatService:
                 session_id=session.session_id
             )
 
-        # Run the Engine
+        # Run the engine to process the user's message.
         decision = await self._engine.handle_message(session, user_text)
 
-        # Save Session
+        # Save the updated session state.
         self._session_repo.save(session)
 
         return ChatTurnResult(
@@ -117,11 +116,10 @@ class ChatService:
             workflow_id, score = match
             logger.info(f"Router selected '{workflow_id}' with score {score}")
             
-            # Retrieve the full definition to get the start_step
-            # Note: This might trigger a DB fetch in the future (Lazy Loading)
+            # Retrieve the full workflow definition to get the start_step.
             workflow = self._workflow_repo.get_workflow(workflow_id)
             
-            # Push initial frame
+            # Push the initial frame onto the session stack.
             initial_frame = Frame(
                 workflow_name=workflow.name,
                 current_step_id=workflow.start_step

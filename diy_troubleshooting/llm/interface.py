@@ -3,7 +3,7 @@ from typing import List, Type, TypeVar
 
 from pydantic import BaseModel
 
-# Generic type for the Pydantic model we expect back
+# Generic type variable for the Pydantic model expected in structured responses.
 T = TypeVar("T", bound=BaseModel)
 
 class LLMProvider(ABC):

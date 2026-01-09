@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
-# --- INPUT SCHEMAS ---
+# --- Input schemas for API requests. ---
 
 class UserMessage(BaseModel):
     """
@@ -16,7 +16,7 @@ class UserMessage(BaseModel):
     text: str
 
 
-# --- OUTPUT SCHEMAS ---
+# --- Output schemas for API responses. ---
 
 class CreateSessionResponse(BaseModel):
     session_id: str

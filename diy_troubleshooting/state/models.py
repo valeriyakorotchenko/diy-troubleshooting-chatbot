@@ -28,7 +28,7 @@ class Frame(BaseModel):
     workflow_name: str
     current_step_id: str
     
-    # The 'Mailbox' for child results
+    # Holds the result from a completed child workflow until the parent processes it.
     pending_child_result: Optional[WorkflowResult] = None
 
 

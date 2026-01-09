@@ -20,10 +20,10 @@ class StateMachineTransition(Enum):
     of goal completion for the current step.
     """
 
-    HOLD = auto()  # Pointer remains on current node
-    ADVANCE = auto()  # Pointer moved to the next linear or branched node
-    PUSH = auto()  # Child workflow frame pushed onto stack
-    POP = auto()  # Frame popped (workflow completed)
+    HOLD = auto()  # The pointer remains on the current node.
+    ADVANCE = auto()  # The pointer moved to the next linear or branched node.
+    PUSH = auto()  # A child workflow frame was pushed onto the stack.
+    POP = auto()  # The frame was popped because the workflow completed.
 
 
 @dataclass

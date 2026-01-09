@@ -9,7 +9,7 @@ from ..infrastructure.database.connection import engine
 from ..infrastructure.database.tables import WorkflowDBModel
 
 
-# The Interface
+# Abstract interface for static workflow definitions access.
 class WorkflowRepository(ABC):
     """
     Defines how the application accesses Workflow definitions.
@@ -43,7 +43,7 @@ class StaticWorkflowRepository(WorkflowRepository):
     """
 
     def __init__(self):
-        # Index for O(1) lookup
+        # Store workflows in a dict for O(1) lookup by ID.
         self._index: Dict[str, Workflow] = HARDCODED_WORKFLOWS
 
     def get_workflow(self, workflow_id: str) -> Workflow:
@@ -68,7 +68,7 @@ class PostgresWorkflowRepository(WorkflowRepository):
             if not result:
                 raise ValueError(f"Workflow '{workflow_id}' not found in database.")
 
-            # Recursively parse the entire JSON tree.
+            # Recursively parse the entire JSON tree into domain objects.
             return Workflow(**result.workflow_data)
 
     def workflow_exists(self, workflow_id: str) -> bool:
