@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 
 class WorkflowEngine:
     def __init__(self, repository: WorkflowRepository, llm_provider: LLMProvider):
-        self.repository = repository
-        self.llm_provider = llm_provider
+        self._repository = repository
+        self._llm_provider = llm_provider
 
     async def handle_message(
         self, session: SessionState, user_input: str
@@ -204,7 +204,7 @@ class WorkflowEngine:
         """
         Push a new frame for the child workflow onto the stack.
         """
-        target_workflow = self.repository.get_workflow(target_workflow_id)
+        target_workflow = self._repository.get_workflow(target_workflow_id)
         child_frame = Frame(
             workflow_name=target_workflow_id,
             current_step_id=target_workflow.start_step,
@@ -239,7 +239,7 @@ class WorkflowEngine:
         )
 
         return await introduce_step(
-            llm=self.llm_provider,
+            llm=self._llm_provider,
             from_step=previous_step,
             to_step=next_step,
             meta=meta,
@@ -257,12 +257,12 @@ class WorkflowEngine:
         active_frame = session.active_frame
         if not active_frame:
             raise ValueError("Session stack is empty.")
-        workflow_def = self.repository.get_workflow(active_frame.workflow_name)
+        workflow_def = self._repository.get_workflow(active_frame.workflow_name)
         step_def = workflow_def.steps[active_frame.current_step_id]
         return active_frame, workflow_def, step_def
 
     def _workflow_exists(self, workflow_id: str) -> bool:
-        return self.repository.workflow_exists(workflow_id)
+        return self._repository.workflow_exists(workflow_id)
 
     async def _execute_step(
         self,
@@ -271,7 +271,7 @@ class WorkflowEngine:
         user_input: Optional[str],
         history: list[Message],
     ) -> StepDecision:
-        executor = StepExecutor(self.llm_provider)
+        executor = StepExecutor(self._llm_provider)
         return await executor.run_turn(
             step=step_def, frame=active_frame, user_input=user_input, history=history
         )
