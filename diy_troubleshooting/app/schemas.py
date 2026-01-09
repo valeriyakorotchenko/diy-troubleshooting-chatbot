@@ -1,11 +1,12 @@
 """
 API Layer - Request/Response Schemas
 """
-from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
 
-# --- INPUT SCHEMAS ---
+from pydantic import BaseModel
+
+# --- Input schemas for API requests. ---
 
 class UserMessage(BaseModel):
     """
@@ -15,7 +16,7 @@ class UserMessage(BaseModel):
     text: str
 
 
-# --- OUTPUT SCHEMAS ---
+# --- Output schemas for API responses. ---
 
 class CreateSessionResponse(BaseModel):
     session_id: str

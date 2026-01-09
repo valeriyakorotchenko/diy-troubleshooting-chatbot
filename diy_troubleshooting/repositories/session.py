@@ -1,14 +1,13 @@
 import uuid
 from abc import ABC, abstractmethod
-from typing import Optional, Dict
 from datetime import datetime
+from typing import Dict, Optional
 
 from sqlmodel import Session, select
 
-# Domain & Infra Imports
-from ..state.models import SessionState
-from ..infrastructure.database.tables import SessionDBModel
 from ..infrastructure.database.connection import engine
+from ..infrastructure.database.tables import SessionDBModel
+from ..state.models import SessionState
 
 
 class SessionRepository(ABC):
@@ -72,11 +71,11 @@ class PostgresSessionRepository(SessionRepository):
     """
 
     def create(self) -> SessionState:
-        # Create the (Domain) Python object
+        # Create the domain session object with a new UUID.
         new_id = str(uuid.uuid4())
         domain_session = SessionState(session_id=new_id)
 
-        # Save to DB
+        # Persist the session to the database.
         db_model = SessionDBModel(
             session_id=new_id, state=domain_session.model_dump(mode="json")
         )
@@ -97,11 +96,10 @@ class PostgresSessionRepository(SessionRepository):
             if not result:
                 return None
 
-            # Deserialize JSONB back into Pydantic Domain Model
+            # Deserialize the JSONB data back into a Pydantic domain model.
             session = SessionState(**result.state)
             
-            # Inject the timestamp from the SQL column
-            # (Otherwise this field would just be the default 'now' from when we instantiated it above)
+            # Inject the timestamp from the SQL column to preserve the actual update time.
             session.updated_at = result.updated_at
 
             return session
@@ -114,13 +112,13 @@ class PostgresSessionRepository(SessionRepository):
             result = db.exec(statement).first()
 
             if result:
-                # Update the JSON blob and the timestamp
+                # Update the JSON blob and the timestamp.
                 result.state = session.model_dump(mode="json")
                 result.updated_at = datetime.utcnow()
                 db.add(result)
                 db.commit()
             else:
-                # Fallback if save() called on non-existent session
+                # Raise an error if save() is called on a non-existent session.
                 raise ValueError(f"Session {session.session_id} does not exist in DB.")
 
     def delete(self, session_id: str) -> bool:

@@ -8,7 +8,7 @@ It exposes the SQLModel engine which will be used by the Repositories.
 from sqlmodel import create_engine, SQLModel
 from ...config import settings
 
-# echo=False in production to avoid leaking sensitive data in logs
+# Disable SQL echo in production to avoid leaking sensitive data in logs.
 engine = create_engine(settings.DATABASE_URL, echo=False)
 
 

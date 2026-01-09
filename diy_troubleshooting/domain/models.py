@@ -21,7 +21,8 @@ require complex domain behavior, consider extracting a separate DTO layer.
 """
 
 from enum import StrEnum
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 

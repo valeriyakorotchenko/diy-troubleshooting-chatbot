@@ -7,24 +7,24 @@ hardcoded workflows defined in data/hardcoded_workflows.py.
 Usage:
     python -m scripts.seed_db
 """
-import sys
 import os
+import sys
 from dataclasses import asdict
 
-# Ensure the project root is in python path
+# Add the project root to the Python path for imports.
 sys.path.append(os.getcwd())
 
 from fastapi.encoders import jsonable_encoder
 from sqlmodel import Session, select
 
+from diy_troubleshooting.data.hardcoded_workflows import HARDCODED_WORKFLOWS
 from diy_troubleshooting.infrastructure.database.connection import engine, init_db
 from diy_troubleshooting.infrastructure.database.tables import WorkflowDBModel
-from diy_troubleshooting.data.hardcoded_workflows import HARDCODED_WORKFLOWS
 
 def seed_workflows():
     print("Initializing Database Connection...")
 
-    # Create tables if they don't exist
+    # Create tables if they do not exist.
     init_db()
 
     with Session(engine) as session:
@@ -33,14 +33,13 @@ def seed_workflows():
         for wf_id, workflow in HARDCODED_WORKFLOWS.items():
             print(f"Processing workflow: {wf_id}")
 
-            # Serialize the Dataclass to JSON-compatible dict
-            # jsonable_encoder handles nested objects, UUIDs, Enums, etc.
+            # Serialize the workflow to a JSON-compatible dict using FastAPI's encoder.
             wf_data_json = jsonable_encoder(workflow)
 
-            # Derive Title (Fallback to name if title field missing in dataclass)
+            # Derive title from the workflow, falling back to a formatted name if missing.
             wf_title = getattr(workflow, "title", workflow.name.replace("_", " ").title())
 
-            # Check for existing record, update if exists, insert if not (Upsert Logic)
+            # Upsert logic: update existing records or insert new ones.
             statement = select(WorkflowDBModel).where(WorkflowDBModel.workflow_id == wf_id)
             existing_wf = session.exec(statement).first()
 

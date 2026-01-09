@@ -10,18 +10,18 @@ import logging
 from typing import List
 
 from ..domain.models import Step
-from ..state.models import Frame, Message
-from .schemas.decisions import StepDecision
 from ..llm.interface import LLMProvider
-from .prompts import render, Template
+from ..state.models import Frame, Message
+from .prompts import Template, render
+from .schemas.decisions import StepDecision
 
 logger = logging.getLogger(__name__)
 
 
 class StepExecutor:
-    # DEPENDENCY INJECTION: We ask for the generic Provider
+    # The LLM provider is injected as a dependency.
     def __init__(self, llm_provider: LLMProvider):
-        self.llm = llm_provider
+        self._llm = llm_provider
 
     async def run_turn(
         self,
@@ -42,8 +42,7 @@ class StepExecutor:
             mailbox=frame.pending_child_result,
         )
 
-        # Prepare Messages (System + History + New Input)
-        # The role/content dict format is an industry standard across LLM providers.
+        # Prepare messages by combining the system prompt, history, and new input.
         messages = [{"role": "system", "content": system_prompt}]
         for msg in history:
             messages.append({"role": msg.role, "content": msg.content})
@@ -51,9 +50,8 @@ class StepExecutor:
             messages.append({"role": "user", "content": user_input})
 
         try:
-            # Call LLM with Structured Output
-            # CLEAN CALL: No dependency on OpenAI specifics here
-            decision = await self.llm.generate_structured_output(
+            # Call the LLM with structured output to get a decision.
+            decision = await self._llm.generate_structured_output(
                 messages=messages,
                 response_model=StepDecision
             )

@@ -15,19 +15,20 @@ overrides during testing.
 
 
 from functools import lru_cache
+
 from fastapi import Depends
 
 from ..config import settings
-from ..llm.interface import LLMProvider
-from ..llm.adapters.openai_adapter import OpenAIAdapter
-from ..repositories.workflow import WorkflowRepository, PostgresWorkflowRepository
-from ..repositories.session import SessionRepository, PostgresSessionRepository
 from ..execution.engine import WorkflowEngine
-from ..services.workflow_router import WorkflowRouter, MockWorkflowRouter
+from ..llm.adapters.openai_adapter import OpenAIAdapter
+from ..llm.interface import LLMProvider
+from ..repositories.session import PostgresSessionRepository, SessionRepository
+from ..repositories.workflow import PostgresWorkflowRepository, WorkflowRepository
 from ..services.chat import ChatService
+from ..services.workflow_router import MockWorkflowRouter, WorkflowRouter
 
 
-# LLM Provider (Singleton)
+# Provides a singleton LLM provider instance.
 @lru_cache()
 def get_llm_provider() -> LLMProvider:
     return OpenAIAdapter(
@@ -35,33 +36,32 @@ def get_llm_provider() -> LLMProvider:
         model_name=settings.OPENAI_MODEL
     )
 
-# The Router (Singleton)
+# Provides a singleton workflow router instance.
 @lru_cache()
 def get_workflow_router() -> WorkflowRouter:
     return MockWorkflowRouter()
 
-# Workflow Repository (Singleton)
+# Provides a singleton workflow repository instance.
 @lru_cache()
 def get_workflow_repository() -> WorkflowRepository:
     # return StaticWorkflowRepository()
     return PostgresWorkflowRepository()
 
-# Session Repository (Singleton)
-# Note: In-memory storage must be a singleton so data persists across requests!
+# Provides a singleton session repository to ensure data persists across requests.
 @lru_cache()
 def get_session_repository() -> SessionRepository:
     # return InMemorySessionRepository()
     return PostgresSessionRepository()
 
-# The Engine (Singleton Service)
+# Provides a singleton workflow engine to maintain consistent state handling.
 @lru_cache()
 def get_workflow_engine(
     llm: LLMProvider = Depends(get_llm_provider),
-    repo: WorkflowRepository = Depends(get_workflow_repository)
+    workflow_repo: WorkflowRepository = Depends(get_workflow_repository)
 ) -> WorkflowEngine:
-    return WorkflowEngine(repository=repo, llm_provider=llm)
+    return WorkflowEngine(workflow_repository=workflow_repo, llm_provider=llm)
  
-# The Chat Service (Singleton Service)
+# Provides a singleton chat service to coordinate session and workflow operations.
 @lru_cache()
 def get_chat_service(
     session_repo: SessionRepository = Depends(get_session_repository),

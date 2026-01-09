@@ -1,19 +1,19 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import Response
 
-from .dependencies import get_chat_service
 from ..services.chat import ChatService
+from .dependencies import get_chat_service
 from .schemas import (
-    CreateSessionResponse, 
-    UserMessage, 
     ChatMessage,
-    ChatResponse, 
-    SessionRead
+    ChatResponse,
+    CreateSessionResponse,
+    SessionRead,
+    UserMessage,
 )
 
 app = FastAPI(title="DIY Agentic Chatbot")
 
-# --- Endpoints ---
+# Endpoint definitions.
 
 @app.post(
     "/sessions", 
@@ -43,9 +43,8 @@ def get_session(
     
     active_frame = session.active_frame
     
-    # We manually transform the Domain 'Message' into the API 'ChatMessage'.
-    # This makes it visible how data moves from internal state to public API.
-    # "dto" stands for Data Transfer Object.
+    # Transform domain Message objects into API ChatMessage DTOs (Data Transfer Objects).
+    # This decouples the internal state model from the public API contract.
     history_dto = [
         ChatMessage(role=msg.role, content=msg.content) 
         for msg in session.history
@@ -73,7 +72,7 @@ def delete_session(
     if not success:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # For 204, we must explicitly return a Response object with no content
+    # Return a Response object with no content for HTTP 204.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -84,10 +83,10 @@ async def handle_message(
     service: ChatService = Depends(get_chat_service)
 ):
     try:
-        # We ask the service to process the message and give us the turn result
+        # Process the message through the chat service.
         turn_result = await service.process_message(session_id, message.text)
 
-        # Explicitly Map: TurnResult (Service) -> ChatResponse (API)
+        # Map the service TurnResult to the API ChatResponse.
         return ChatResponse(
             reply=turn_result.reply,
             status=turn_result.status,
