@@ -16,7 +16,7 @@ This avoids awkward concatenation of multiple independent LLM replies.
 import logging
 from typing import Optional, Tuple
 
-from ..domain.models import Step, StepType, Workflow, WorkflowLink
+from ..domain.models import Step, StepType, Workflow
 from ..llm.interface import LLMProvider
 from ..repositories.workflow import WorkflowRepository
 from ..state.models import Frame, Message, SessionState, WorkflowResult
@@ -83,7 +83,7 @@ class WorkflowEngine:
                 user_input=user_input,
             )
 
-        self._update_history(session, user_input, final_decision.reply_to_user)
+        session.update_history(user_input, final_decision.reply_to_user)
         return final_decision
 
     # ==========================================================================
@@ -116,11 +116,18 @@ class WorkflowEngine:
 
             # If the current step is END, the workflow is complete. Pop the frame.
             if current_step.type == StepType.END:
-                self._pop_frame(session, workflow, decision)
+                result = WorkflowResult(
+                    source_workflow_id=workflow.name,
+                    status="SUCCESS",
+                    summary=decision.reply_to_user,
+                    slots_collected={},
+                )
+                session.return_from_workflow(result)
+                logger.info(f"Child workflow '{workflow.name}' completed, result delivered to parent")
                 return StateMachineTransition.POP
 
             # Otherwise, resolve and advance to the next step.
-            next_step_id = self._resolve_next_step_id(current_step, decision)
+            next_step_id = current_step.resolve_next_step_id(decision.result_value)
 
             if next_step_id is None:
                 raise ValueError(
@@ -132,7 +139,7 @@ class WorkflowEngine:
                     f"Step '{current_step.id}' references non-existent next step '{next_step_id}'"
                 )
 
-            frame.current_step_id = next_step_id
+            session.advance_to_step(next_step_id)
             return StateMachineTransition.ADVANCE
 
         # Validate and push the child workflow onto the stack.
@@ -145,69 +152,14 @@ class WorkflowEngine:
                 logger.warning(f"CALL_WORKFLOW target not found: {target_workflow_id}")
                 return StateMachineTransition.HOLD
 
-            self._push_child_workflow(session, target_workflow_id)
+            target_workflow = self._workflow_repository.get_workflow(target_workflow_id)
+            session.enter_workflow(target_workflow_id, target_workflow.start_step)
+            logger.info(f"Pushed child workflow: {target_workflow_id}")
             return StateMachineTransition.PUSH
 
         # Unknown status received. Log a warning and hold.
         logger.warning(f"Unknown StepStatus received: {decision.status}")
         return StateMachineTransition.HOLD
-
-    def _resolve_next_step_id(
-        self, current_step: Step, decision: StepDecision
-    ) -> Optional[str]:
-        """
-        Determine the next step ID based on step type and decision.
-
-        For 'ask_choice' steps, uses the selected option's next_step_id.
-        For other steps, uses the step's default next_step.
-        """
-        if current_step.type == "ask_choice" and current_step.options:
-            selected_option = next(
-                (opt for opt in current_step.options if opt.id == decision.result_value),
-                None,
-            )
-            if selected_option:
-                return selected_option.next_step_id
-            # Fall through to the default next_step if no option matched.
-
-        return current_step.next_step
-
-    def _pop_frame(
-        self,
-        session: SessionState,
-        completed_workflow: Workflow,
-        final_decision: StepDecision,
-    ) -> None:
-        """
-        Pop the current frame. If a parent frame exists, deliver the result to its mailbox.
-        """
-        session.stack.pop()
-
-        if session.stack:
-            parent_frame = session.stack[-1]
-            parent_frame.pending_child_result = WorkflowResult(
-                source_workflow_id=completed_workflow.name,
-                status="SUCCESS",
-                summary=final_decision.reply_to_user,
-                slots_collected={},
-            )
-            logger.info(f"Child workflow '{completed_workflow.name}' completed, result delivered to parent")
-
-    def _push_child_workflow(
-        self,
-        session: SessionState,
-        target_workflow_id: str,
-    ) -> None:
-        """
-        Push a new frame for the child workflow onto the stack.
-        """
-        target_workflow = self._workflow_repository.get_workflow(target_workflow_id)
-        child_frame = Frame(
-            workflow_name=target_workflow_id,
-            current_step_id=target_workflow.start_step,
-        )
-        session.stack.append(child_frame)
-        logger.info(f"Pushed child workflow: {target_workflow_id}")
 
     # ==========================================================================
     # Response Generation
@@ -231,7 +183,10 @@ class WorkflowEngine:
         meta = TransitionMeta(
             transition_type=transition,
             reasoning=decision.reasoning,
-            workflow_link=self._find_workflow_link(previous_step, decision.result_value),
+            workflow_link=(
+                previous_step.find_workflow_link(decision.result_value)
+                if decision.result_value else None
+            ),
             child_result=new_frame.pending_child_result,
         )
 
@@ -271,23 +226,4 @@ class WorkflowEngine:
         executor = StepExecutor(self._llm_provider)
         return await executor.run_turn(
             step=step_def, frame=active_frame, user_input=user_input, history=history
-        )
-
-    def _update_history(
-        self, session: SessionState, user_input: Optional[str], reply: str
-    ):
-        """Append user input and assistant reply to conversation history."""
-        if user_input:
-            session.history.append(Message(role="user", content=user_input))
-        session.history.append(Message(role="assistant", content=reply))
-
-    def _find_workflow_link(
-        self, step: Step, target_workflow_id: Optional[str]
-    ) -> Optional[WorkflowLink]:
-        """Find the WorkflowLink that matches the target workflow ID."""
-        if not target_workflow_id or not step.suggested_links:
-            return None
-        return next(
-            (link for link in step.suggested_links if link.target_workflow_id == target_workflow_id),
-            None,
         )
