@@ -106,41 +106,35 @@ class WorkflowEngine:
         - PUSH: Appends new Frame to session.stack
         - POP: Removes Frame from session.stack, delivers result to parent
         """
-        # Hold on the current step without any state mutation.
-        if decision.status in (StepStatus.IN_PROGRESS, StepStatus.GIVE_UP):
-            return StateMachineTransition.HOLD
+        match decision.status:
+            case StepStatus.IN_PROGRESS | StepStatus.GIVE_UP:
+                return StateMachineTransition.HOLD
 
-        # Check if the current step is an END step to pop, otherwise advance to the next step.
-        if decision.status == StepStatus.COMPLETE:
-            current_step = workflow.steps[frame.current_step_id]
+            case StepStatus.COMPLETE:
+                current_step = workflow.steps[frame.current_step_id]
 
-            # If the current step is END, the workflow is complete. Pop the frame.
-            if current_step.type == StepType.END:
-                result = WorkflowResult(
-                    source_workflow_id=workflow.name,
-                    status="SUCCESS",
-                    summary=decision.reply_to_user,
-                    slots_collected={},
-                )
-                session.return_from_workflow(result)
-                return StateMachineTransition.POP
+                if current_step.type == StepType.END:
+                    result = WorkflowResult(
+                        source_workflow_id=workflow.name,
+                        status="SUCCESS",
+                        summary=decision.reply_to_user,
+                        slots_collected={},
+                    )
+                    session.return_from_workflow(result)
+                    return StateMachineTransition.POP
 
-            # Otherwise, resolve and advance to the next step.
-            next_step_id = current_step.resolve_next_step_id(decision.result_value)
-            session.advance_to_step(next_step_id)
-            return StateMachineTransition.ADVANCE
+                next_step_id = current_step.resolve_next_step_id(decision.result_value)
+                session.advance_to_step(next_step_id)
+                return StateMachineTransition.ADVANCE
 
-        # Validate and push the child workflow onto the stack.
-        if decision.status == StepStatus.CALL_WORKFLOW:
-            target_workflow_id = decision.result_value
-            target_workflow = self._workflow_repository.get_workflow(target_workflow_id)
-            
-            session.enter_workflow(target_workflow_id, target_workflow.start_step)
+            case StepStatus.CALL_WORKFLOW:
+                target_workflow_id = decision.result_value
+                target_workflow = self._workflow_repository.get_workflow(target_workflow_id)
+                session.enter_workflow(target_workflow_id, target_workflow.start_step)
+                return StateMachineTransition.PUSH
 
-            return StateMachineTransition.PUSH
-
-        # Unknown status received. Log a warning and hold.
-        return StateMachineTransition.HOLD
+            case _:
+                return StateMachineTransition.HOLD
 
     # ==========================================================================
     # Response Generation
