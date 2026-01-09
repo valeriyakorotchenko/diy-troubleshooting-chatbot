@@ -123,42 +123,23 @@ class WorkflowEngine:
                     slots_collected={},
                 )
                 session.return_from_workflow(result)
-                logger.info(f"Child workflow '{workflow.name}' completed, result delivered to parent")
                 return StateMachineTransition.POP
 
             # Otherwise, resolve and advance to the next step.
             next_step_id = current_step.resolve_next_step_id(decision.result_value)
-
-            if next_step_id is None:
-                raise ValueError(
-                    f"Step '{current_step.id}' has no next_step defined and no matching option "
-                    f"for result_value '{decision.result_value}'"
-                )
-            if next_step_id not in workflow.steps:
-                raise ValueError(
-                    f"Step '{current_step.id}' references non-existent next step '{next_step_id}'"
-                )
-
             session.advance_to_step(next_step_id)
             return StateMachineTransition.ADVANCE
 
         # Validate and push the child workflow onto the stack.
         if decision.status == StepStatus.CALL_WORKFLOW:
             target_workflow_id = decision.result_value
-            if not target_workflow_id:
-                logger.warning("CALL_WORKFLOW status without target workflow ID")
-                return StateMachineTransition.HOLD
-            if not self._workflow_exists(target_workflow_id):
-                logger.warning(f"CALL_WORKFLOW target not found: {target_workflow_id}")
-                return StateMachineTransition.HOLD
-
             target_workflow = self._workflow_repository.get_workflow(target_workflow_id)
+            
             session.enter_workflow(target_workflow_id, target_workflow.start_step)
-            logger.info(f"Pushed child workflow: {target_workflow_id}")
+
             return StateMachineTransition.PUSH
 
         # Unknown status received. Log a warning and hold.
-        logger.warning(f"Unknown StepStatus received: {decision.status}")
         return StateMachineTransition.HOLD
 
     # ==========================================================================
