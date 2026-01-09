@@ -133,6 +133,45 @@ class Step(BaseModel):
     next_step: Optional[str] = None
     slot_name: Optional[str] = None
 
+    def resolve_next_step_id(self, selected_option_id: Optional[str] = None) -> Optional[str]:
+        """
+        Determine the next step ID based on a selected option or the default.
+
+        For ask_choice steps with a matching option, returns that option's
+        next_step_id. Otherwise, returns the step's default next_step.
+
+        Args:
+            selected_option_id: The ID of the selected option (for ask_choice steps).
+
+        Returns:
+            The next step ID, or None if no valid transition exists.
+        """
+        if self.type == StepType.ASK_CHOICE and self.options and selected_option_id:
+            selected = next(
+                (opt for opt in self.options if opt.id == selected_option_id),
+                None,
+            )
+            if selected:
+                return selected.next_step_id
+        return self.next_step
+
+    def find_workflow_link(self, target_workflow_id: str) -> Optional["WorkflowLink"]:
+        """
+        Find a suggested workflow link by target workflow ID.
+
+        Args:
+            target_workflow_id: The workflow ID to match against.
+
+        Returns:
+            The matching WorkflowLink, or None if not found.
+        """
+        if not self.suggested_links:
+            return None
+        return next(
+            (link for link in self.suggested_links if link.target_workflow_id == target_workflow_id),
+            None,
+        )
+
 
 class Workflow(BaseModel):
     """

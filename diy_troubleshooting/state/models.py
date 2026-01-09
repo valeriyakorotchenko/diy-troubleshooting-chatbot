@@ -51,3 +51,58 @@ class SessionState(BaseModel):
         if not self.stack:
             return None
         return self.stack[-1]
+
+    def update_history(self, user_input: Optional[str], assistant_reply: str) -> None:
+        """
+        Append a user message and assistant reply to conversation history.
+
+        Args:
+            user_input: The user's message (omitted from history if None).
+            assistant_reply: The assistant's response.
+        """
+        if user_input:
+            self.history.append(Message(role="user", content=user_input))
+        self.history.append(Message(role="assistant", content=assistant_reply))
+
+    def advance_to_step(self, step_id: str) -> None:
+        """
+        Advance the active frame to a new step.
+
+        Args:
+            step_id: The step ID to advance to.
+
+        Raises:
+            ValueError: If there is no active frame.
+        """
+        current_frame = self.active_frame
+        if not current_frame:
+            raise ValueError("Cannot advance: no active frame.")
+        current_frame.current_step_id = step_id
+
+    def enter_workflow(self, workflow_name: str, start_step_id: str) -> None:
+        """
+        Push a new frame for a child workflow onto the stack.
+
+        Args:
+            workflow_name: The workflow identifier.
+            start_step_id: The entry point step ID for the workflow.
+        """
+        child_frame = Frame(
+            workflow_name=workflow_name,
+            current_step_id=start_step_id,
+        )
+        self.stack.append(child_frame)
+
+    def return_from_workflow(self, result: WorkflowResult) -> None:
+        """
+        Pop the current frame and deliver the result to the parent frame's mailbox.
+
+        If a parent frame exists, the result is placed in its pending_child_result
+        for processing on the next turn.
+
+        Args:
+            result: The workflow result to deliver to the parent.
+        """
+        self.stack.pop()
+        if self.stack:
+            self.stack[-1].pending_child_result = result
