@@ -41,24 +41,24 @@ class ChatService:
         engine: WorkflowEngine,
         router: WorkflowRouter
     ):
-        self.session_repo = session_repository
-        self.workflow_repo = workflow_repository
-        self.engine = engine
-        self.router = router
+        self._session_repo = session_repository
+        self._workflow_repo = workflow_repository
+        self._engine = engine
+        self._router = router
 
     def create_session(self) -> SessionState:
         """Creates a new empty session."""
-        return self.session_repo.create()
+        return self._session_repo.create()
 
     def get_session(self, session_id: str) -> Optional[SessionState]:
         """Retrieves a session (for resuming)."""
-        return self.session_repo.get(session_id)
+        return self._session_repo.get(session_id)
 
     def delete_session(self, session_id: str) -> bool:
         """Deletes a session."""
         # Note: SessionRepo needs to implement delete()
-        if hasattr(self.session_repo, 'delete'):
-             return self.session_repo.delete(session_id)
+        if hasattr(self._session_repo, 'delete'):
+             return self._session_repo.delete(session_id)
         return False
 
     async def process_message(self, session_id: str, user_text: str) -> dict:
@@ -72,7 +72,7 @@ class ChatService:
         """
         
         # Load Session
-        session = self.session_repo.get(session_id)
+        session = self._session_repo.get(session_id)
         if not session:
             raise ValueError(f"Session {session_id} not found")
 
@@ -92,10 +92,10 @@ class ChatService:
             )
 
         # Run the Engine
-        decision = await self.engine.handle_message(session, user_text)
+        decision = await self._engine.handle_message(session, user_text)
 
         # Save Session
-        self.session_repo.save(session)
+        self._session_repo.save(session)
 
         return ChatTurnResult(
                 reply=decision.reply_to_user,
@@ -111,7 +111,7 @@ class ChatService:
         """
         logger.info(f"Cold Start detected for session {session.session_id}")
         
-        match = await self.router.find_best_workflow(user_text)
+        match = await self._router.find_best_workflow(user_text)
         
         if match:
             workflow_id, score = match
@@ -119,7 +119,7 @@ class ChatService:
             
             # Retrieve the full definition to get the start_step
             # Note: This might trigger a DB fetch in the future (Lazy Loading)
-            workflow = self.workflow_repo.get_workflow(workflow_id)
+            workflow = self._workflow_repo.get_workflow(workflow_id)
             
             # Push initial frame
             initial_frame = Frame(

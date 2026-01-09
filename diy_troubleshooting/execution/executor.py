@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class StepExecutor:
     # DEPENDENCY INJECTION: We ask for the generic Provider
     def __init__(self, llm_provider: LLMProvider):
-        self.llm = llm_provider
+        self._llm = llm_provider
 
     async def run_turn(
         self,
@@ -53,7 +53,7 @@ class StepExecutor:
         try:
             # Call LLM with Structured Output
             # CLEAN CALL: No dependency on OpenAI specifics here
-            decision = await self.llm.generate_structured_output(
+            decision = await self._llm.generate_structured_output(
                 messages=messages,
                 response_model=StepDecision
             )
