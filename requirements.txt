@@ -8,6 +8,8 @@ jinja2>=3.0.0
 fastapi>=0.115.0
 uvicorn>=0.32.0
 
-# Database 
+# Database
 sqlmodel
-psycopg2-binary
+asyncpg
+greenlet
+psycopg2-binary  # Used by sync seed script only

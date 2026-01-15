@@ -46,20 +46,17 @@ class ChatService:
         self._engine = engine
         self._router = router
 
-    def create_session(self) -> SessionState:
+    async def create_session(self) -> SessionState:
         """Creates a new empty session."""
-        return self._session_repo.create()
+        return await self._session_repo.create()
 
-    def get_session(self, session_id: str) -> Optional[SessionState]:
+    async def get_session(self, session_id: str) -> Optional[SessionState]:
         """Retrieves a session (for resuming)."""
-        return self._session_repo.get(session_id)
+        return await self._session_repo.get(session_id)
 
-    def delete_session(self, session_id: str) -> bool:
+    async def delete_session(self, session_id: str) -> bool:
         """Deletes a session."""
-        # Note: SessionRepo needs to implement delete()
-        if hasattr(self._session_repo, 'delete'):
-             return self._session_repo.delete(session_id)
-        return False
+        return await self._session_repo.delete(session_id)
 
     async def process_message(self, session_id: str, user_text: str) -> dict:
         """
@@ -72,7 +69,7 @@ class ChatService:
         """
         
         # Load the session from the repository.
-        session = self._session_repo.get(session_id)
+        session = await self._session_repo.get(session_id)
         if not session:
             raise ValueError(f"Session {session_id} not found")
 
@@ -94,7 +91,7 @@ class ChatService:
         decision = await self._engine.handle_message(session, user_text)
 
         # Save the updated session state.
-        self._session_repo.save(session)
+        await self._session_repo.save(session)
 
         return ChatTurnResult(
                 reply=decision.reply_to_user,
@@ -117,7 +114,7 @@ class ChatService:
             logger.info(f"Router selected '{workflow_id}' with score {score}")
             
             # Retrieve the full workflow definition to get the start_step.
-            workflow = self._workflow_repo.get_workflow(workflow_id)
+            workflow = await self._workflow_repo.get_workflow(workflow_id)
             
             # Push the initial frame onto the session stack.
             initial_frame = Frame(

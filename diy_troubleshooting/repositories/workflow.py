@@ -1,79 +1,67 @@
 from abc import ABC, abstractmethod
-from typing import Dict
 
-from sqlmodel import Session, select
+from sqlmodel import select
 
-from ..data.hardcoded_workflows import HARDCODED_WORKFLOWS
 from ..domain.models import Workflow
-from ..infrastructure.database.connection import engine
+from ..infrastructure.database.connection import async_session_factory
 from ..infrastructure.database.tables import WorkflowDBModel
 
 
-# Abstract interface for static workflow definitions access.
 class WorkflowRepository(ABC):
     """
     Defines how the application accesses Workflow definitions.
-    This allows us change how data is accessed (Memory -> SQL -> API) later
-    without changing the WorkflowEngine code.
+
+    All methods are async to keep the event loop unblocked. How this is
+    achieved (native async driver vs thread-offloaded sync) is an implementation
+    detail encapsulated in concrete subclasses. Callers simply await without
+    knowing the underlying mechanism.
     """
 
     @abstractmethod
-    def get_workflow(self, workflow_id: str) -> Workflow:
+    async def get_workflow(self, workflow_id: str) -> Workflow:
         """
         Retrieves a workflow by ID.
         Raises ValueError if not found.
         """
         pass
 
-    def workflow_exists(self, workflow_id: str) -> bool:
+    async def workflow_exists(self, workflow_id: str) -> bool:
         """
         Check if a workflow exists without raising an exception.
         Default implementation uses get_workflow; subclasses may override for efficiency.
         """
         try:
-            self.get_workflow(workflow_id)
+            await self.get_workflow(workflow_id)
             return True
         except ValueError:
             return False
 
 
-class StaticWorkflowRepository(WorkflowRepository):
-    """
-    Get workflows from a hardcoded list in memory.
-    """
-
-    def __init__(self):
-        # Store workflows in a dict for O(1) lookup by ID.
-        self._index: Dict[str, Workflow] = HARDCODED_WORKFLOWS
-
-    def get_workflow(self, workflow_id: str) -> Workflow:
-        if workflow_id not in self._index:
-            raise ValueError(f"Workflow '{workflow_id}' not found.")
-        return self._index[workflow_id]
-
-    def workflow_exists(self, workflow_id: str) -> bool:
-        return workflow_id in self._index
-
-
 class PostgresWorkflowRepository(WorkflowRepository):
     """
     Reads from PostgreSQL 'workflows' table (JSONB).
+
+    Uses asyncpg driver with SQLAlchemy's async extension for native async
+    database access without blocking the event loop.
     """
 
-    def get_workflow(self, workflow_id: str) -> Workflow:
-        with Session(engine) as db:
-            statement = select(WorkflowDBModel).where(WorkflowDBModel.workflow_id == workflow_id)
-            result = db.exec(statement).first()
+    async def get_workflow(self, workflow_id: str) -> Workflow:
+        async with async_session_factory() as session:
+            statement = select(WorkflowDBModel).where(
+                WorkflowDBModel.workflow_id == workflow_id
+            )
+            result = await session.execute(statement)
+            row = result.scalars().first()
 
-            if not result:
+            if not row:
                 raise ValueError(f"Workflow '{workflow_id}' not found in database.")
 
-            # Recursively parse the entire JSON tree into domain objects.
-            return Workflow(**result.workflow_data)
+            return Workflow(**row.workflow_data)
 
-    def workflow_exists(self, workflow_id: str) -> bool:
-        with Session(engine) as db:
+    async def workflow_exists(self, workflow_id: str) -> bool:
+        async with async_session_factory() as session:
             statement = select(WorkflowDBModel.workflow_id).where(
                 WorkflowDBModel.workflow_id == workflow_id
             )
-            return db.exec(statement).first() is not None
+            result = await session.execute(statement)
+            return result.scalars().first() is not None
