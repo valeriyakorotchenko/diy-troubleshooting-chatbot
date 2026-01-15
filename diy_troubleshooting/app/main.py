@@ -16,20 +16,20 @@ app = FastAPI(title="DIY Agentic Chatbot")
 # Endpoint definitions.
 
 @app.post(
-    "/sessions", 
+    "/sessions",
     response_model=CreateSessionResponse,
     status_code=status.HTTP_201_CREATED
 )
-def create_session(
+async def create_session(
     service: ChatService = Depends(get_chat_service)
 ):
     """Starts a new empty session."""
-    session = service.create_session()
+    session = await service.create_session()
     return CreateSessionResponse(session_id=session.session_id)
 
 
 @app.get("/sessions/{session_id}", response_model=SessionRead)
-def get_session(
+async def get_session(
     session_id: str,
     service: ChatService = Depends(get_chat_service)
 ):
@@ -37,7 +37,7 @@ def get_session(
     Retrieves the full session resource.
     Replaces the previous 'Resume' logic with proper resource retrieval.
     """
-    session = service.get_session(session_id)
+    session = await service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
@@ -61,14 +61,14 @@ def get_session(
 
 
 @app.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_session(
+async def delete_session(
     session_id: str,
     service: ChatService = Depends(get_chat_service)
 ):
     """
     Deletes a session. Returns 204 No Content on success.
     """
-    success = service.delete_session(session_id)
+    success = await service.delete_session(session_id)
     if not success:
         raise HTTPException(status_code=404, detail="Session not found")
     

@@ -18,7 +18,7 @@ from diy_troubleshooting.state import (
     SessionState,
     WorkflowResult,
 )
-from diy_troubleshooting.schemas import StepDecision, StepStatus
+from diy_troubleshooting.execution.schemas.decisions import StepDecision, StepStatus
 from diy_troubleshooting.execution import StepExecutor, WorkflowEngine
 
 __all__ = [

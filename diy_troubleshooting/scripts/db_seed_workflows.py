@@ -5,29 +5,40 @@ Run this script to populate the PostgreSQL database with the
 hardcoded workflows defined in data/hardcoded_workflows.py.
 
 Usage:
-    python -m scripts.seed_db
+    python -m diy_troubleshooting.scripts.db_seed_workflows
+
+This script uses a sync database connection since it runs as a CLI tool
+outside of the async application context.
 """
+
 import os
 import sys
-from dataclasses import asdict
 
 # Add the project root to the Python path for imports.
 sys.path.append(os.getcwd())
 
 from fastapi.encoders import jsonable_encoder
-from sqlmodel import Session, select
+from sqlmodel import Session, SQLModel, create_engine, select
 
+from diy_troubleshooting.config import settings
 from diy_troubleshooting.data.hardcoded_workflows import HARDCODED_WORKFLOWS
-from diy_troubleshooting.infrastructure.database.connection import engine, init_db
 from diy_troubleshooting.infrastructure.database.tables import WorkflowDBModel
+
+# Create a sync engine for the seed script (separate from the async engine used by the app).
+sync_engine = create_engine(settings.DATABASE_URL, echo=False)
+
+
+def init_db_sync():
+    """Create tables if they do not exist."""
+    SQLModel.metadata.create_all(sync_engine)
+
 
 def seed_workflows():
     print("Initializing Database Connection...")
 
-    # Create tables if they do not exist.
-    init_db()
+    init_db_sync()
 
-    with Session(engine) as session:
+    with Session(sync_engine) as session:
         print(f"Found {len(HARDCODED_WORKFLOWS)} workflows to seed.")
 
         for wf_id, workflow in HARDCODED_WORKFLOWS.items():
@@ -44,21 +55,22 @@ def seed_workflows():
             existing_wf = session.exec(statement).first()
 
             if existing_wf:
-                print(f"--> Updating existing record.")
+                print("--> Updating existing record.")
                 existing_wf.title = wf_title
                 existing_wf.workflow_data = wf_data_json
                 session.add(existing_wf)
             else:
-                print(f"--> Creating new record.")
+                print("--> Creating new record.")
                 new_wf = WorkflowDBModel(
                     workflow_id=wf_id,
                     title=wf_title,
-                    workflow_data=wf_data_json
+                    workflow_data=wf_data_json,
                 )
                 session.add(new_wf)
 
         session.commit()
         print("Workflows seeding complete.")
+
 
 if __name__ == "__main__":
     seed_workflows()

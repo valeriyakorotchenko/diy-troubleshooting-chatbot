@@ -47,7 +47,7 @@ class WorkflowEngine:
             raise ValueError("Cannot handle message: session has no active workflow")
 
         # Load the execution context for the current session.
-        frame, workflow, current_step = self._get_execution_context(session)
+        frame, workflow, current_step = await self._get_execution_context(session)
 
         # Delegate to StepExecutor to get the LLM's assessment of user input against the current step's goal.
         decision = await self._execute_step(
@@ -58,7 +58,7 @@ class WorkflowEngine:
         )
 
         # Apply the decision to the state machine. This mutates session.stack and frame.current_step_id.
-        fsm_transition = self._apply_decision(session, frame, workflow, decision)
+        fsm_transition = await self._apply_decision(session, frame, workflow, decision)
 
         # Clear the child result mailbox now that we've processed it.
         if session.active_frame:
@@ -90,7 +90,7 @@ class WorkflowEngine:
     # State Mutation & Translation (The Core Logic)
     # ==========================================================================
 
-    def _apply_decision(
+    async def _apply_decision(
         self,
         session: SessionState,
         frame: Frame,
@@ -129,7 +129,9 @@ class WorkflowEngine:
 
             case StepStatus.CALL_WORKFLOW:
                 target_workflow_id = decision.result_value
-                target_workflow = self._workflow_repository.get_workflow(target_workflow_id)
+                target_workflow = await self._workflow_repository.get_workflow(
+                    target_workflow_id
+                )
                 session.enter_workflow(target_workflow_id, target_workflow.start_step)
                 return StateMachineTransition.PUSH
 
@@ -151,9 +153,9 @@ class WorkflowEngine:
         """
         Generate a StepDecision that introduces the new step after a transition.
 
-        Uses context from the previous step to generate a smooth transition message.
+        Uses context from the previous step to generate a smooth, coherent transition message.
         """
-        new_frame, _, next_step = self._get_execution_context(session)
+        new_frame, _, next_step = await self._get_execution_context(session)
 
         meta = TransitionMeta(
             transition_type=transition,
@@ -178,18 +180,20 @@ class WorkflowEngine:
     # Standard Helpers
     # ==========================================================================
 
-    def _get_execution_context(
+    async def _get_execution_context(
         self, session: SessionState
     ) -> Tuple[Frame, Workflow, Step]:
         active_frame = session.active_frame
         if not active_frame:
             raise ValueError("Session stack is empty.")
-        workflow_def = self._workflow_repository.get_workflow(active_frame.workflow_name)
+        workflow_def = await self._workflow_repository.get_workflow(
+            active_frame.workflow_name
+        )
         step_def = workflow_def.steps[active_frame.current_step_id]
         return active_frame, workflow_def, step_def
 
-    def _workflow_exists(self, workflow_id: str) -> bool:
-        return self._workflow_repository.workflow_exists(workflow_id)
+    async def _workflow_exists(self, workflow_id: str) -> bool:
+        return await self._workflow_repository.workflow_exists(workflow_id)
 
     async def _execute_step(
         self,
