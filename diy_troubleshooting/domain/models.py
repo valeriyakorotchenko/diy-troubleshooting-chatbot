@@ -20,26 +20,30 @@ Tradeoff: This couples the domain layer to Pydantic. If these models later
 require complex domain behavior, consider extracting a separate DTO layer.
 """
 
-from typing import Literal, Optional, List, Dict
+from enum import StrEnum
+from typing import Optional, List, Dict
 from pydantic import BaseModel, Field
 
-"""
-StepType classifies step behavior:
-- instruction: Guidance without user choice
-- ask_choice: Decision point with predefined options
-- ask_slot: Collects specific data from user
-- respond: Provides contextual information
-- end: Terminal step marking workflow completion
-- call_workflow: Triggers a nested sub-workflow
-"""
-StepType = Literal[
-    "instruction",
-    "ask_choice",
-    "ask_slot",
-    "respond",
-    "end",
-    "call_workflow"
-]
+
+class StepType(StrEnum):
+    """
+    Classifies step behavior in a workflow.
+
+    Values:
+    - INSTRUCTION: Guidance without user choice
+    - ASK_CHOICE: Decision point with predefined options
+    - ASK_SLOT: Collects specific data from user
+    - RESPOND: Provides contextual information
+    - END: Terminal step marking workflow completion
+    - CALL_WORKFLOW: Triggers a nested sub-workflow
+    """
+
+    INSTRUCTION = "instruction"
+    ASK_CHOICE = "ask_choice"
+    ASK_SLOT = "ask_slot"
+    RESPOND = "respond"
+    END = "end"
+    CALL_WORKFLOW = "call_workflow"
 
 
 class Media(BaseModel):

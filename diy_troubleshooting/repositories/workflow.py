@@ -25,6 +25,17 @@ class WorkflowRepository(ABC):
         """
         pass
 
+    def workflow_exists(self, workflow_id: str) -> bool:
+        """
+        Check if a workflow exists without raising an exception.
+        Default implementation uses get_workflow; subclasses may override for efficiency.
+        """
+        try:
+            self.get_workflow(workflow_id)
+            return True
+        except ValueError:
+            return False
+
 
 class StaticWorkflowRepository(WorkflowRepository):
     """
@@ -40,18 +51,29 @@ class StaticWorkflowRepository(WorkflowRepository):
             raise ValueError(f"Workflow '{workflow_id}' not found.")
         return self._index[workflow_id]
 
+    def workflow_exists(self, workflow_id: str) -> bool:
+        return workflow_id in self._index
+
 
 class PostgresWorkflowRepository(WorkflowRepository):
     """
     Reads from PostgreSQL 'workflows' table (JSONB).
     """
+
     def get_workflow(self, workflow_id: str) -> Workflow:
         with Session(engine) as db:
             statement = select(WorkflowDBModel).where(WorkflowDBModel.workflow_id == workflow_id)
             result = db.exec(statement).first()
-            
+
             if not result:
                 raise ValueError(f"Workflow '{workflow_id}' not found in database.")
-            
+
             # Recursively parse the entire JSON tree.
             return Workflow(**result.workflow_data)
+
+    def workflow_exists(self, workflow_id: str) -> bool:
+        with Session(engine) as db:
+            statement = select(WorkflowDBModel.workflow_id).where(
+                WorkflowDBModel.workflow_id == workflow_id
+            )
+            return db.exec(statement).first() is not None

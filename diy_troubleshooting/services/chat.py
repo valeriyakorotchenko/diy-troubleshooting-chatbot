@@ -15,7 +15,7 @@ from ..state.models import Frame, SessionState
 from ..repositories.session import SessionRepository
 from ..repositories.workflow import WorkflowRepository
 from ..execution.engine import WorkflowEngine
-from ..schemas.decisions import StepDecision
+from ..execution.schemas.decisions import StepDecision
 from .workflow_router import WorkflowRouter
 
 logger = logging.getLogger(__name__)

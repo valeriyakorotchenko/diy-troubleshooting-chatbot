@@ -18,10 +18,10 @@ class StepStatus(str, Enum):
     COMPLETE: The goal is fully satisfied.
     GIVE_UP: The goal cannot be met due to a blocker or safety issue.
     """
-    IN_PROGRESS = "IN_PROGRESS"       
-    COMPLETE = "COMPLETE"             
-    CALL_WORKFLOW = "CALL_WORKFLOW"  
-    GIVE_UP = "GIVE_UP"          
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETE = "COMPLETE"
+    CALL_WORKFLOW = "CALL_WORKFLOW"
+    GIVE_UP = "GIVE_UP"
 
 class StepDecision(BaseModel):
     """
@@ -29,18 +29,18 @@ class StepDecision(BaseModel):
     Named "StepDecision" because this represents the result of StepExecutor making a decision about the current Step status.
     """
     reply_to_user: str = Field(
-        ..., 
+        ...,
         description="The natural language response to show the user. Be helpful, clear, and safe."
     )
     status: StepStatus = Field(
-        ..., 
+        ...,
         description="The status of the current step after this turn."
     )
     result_value: Optional[str] = Field(
-        None, 
+        None,
         description="The value extracted (for slots), the Option ID (for choices), or the Workflow ID (for branching)."
     )
     reasoning: str = Field(
-        ..., 
+        ...,
         description="Brief internal chain-of-thought justifying why this status was chosen."
     )
